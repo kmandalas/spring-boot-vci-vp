@@ -23,18 +23,18 @@ public class AuthSourceHelper {
         return switch (username) {
             case "testuser1" -> List.of(
                     new Disclosure("credential_holder", "Kyriakos Mandalas"),
-                    new Disclosure("nationality", "Greek"),
+                    new Disclosure("nationality", "Greek \uD83C\uDDEC\uD83C\uDDF7"),
                     new Disclosure("competent_institution", "EOPYY")
             );
             case "testuser2" -> List.of(
                     new Disclosure("credential_holder", "Alina Adminescu"),
-                    new Disclosure("nationality", "Romanian"),
-                    new Disclosure("competent_institution", "Casa Nationala de Asigurari de Sanatate")
+                    new Disclosure("nationality", "Romanian \uD83C\uDDF7\uD83C\uDDF4"),
+                    new Disclosure("competent_institution", "CNAS")
             );
             case "testuser3" -> List.of(
                     new Disclosure("credential_holder", "Tudor Iliev"),
-                    new Disclosure("nationality", "Bulgarian"),
-                    new Disclosure("competent_institution", "Национална здравноосигурителна каса")
+                    new Disclosure("nationality", "Bulgarian \uD83C\uDDE7\uD83C\uDDEC"),
+                    new Disclosure("competent_institution", "НЗОК")
             );
             default -> List.of();
         };
