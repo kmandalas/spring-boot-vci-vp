@@ -1,0 +1,26 @@
+server:
+  port: 9000
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.security: trace
+    org.springframework.security.jackson2: INFO
+
+spring:
+  security:
+    oauth2:
+      authorizationserver:
+        issuer: http://192.168.1.65:9000
+
+---
+spring:
+  config:
+    activate:
+      on-profile: production
+
+  security:
+    oauth2:
+      authorizationserver:
+        issuer: https://vc-auth-server.onrender.com

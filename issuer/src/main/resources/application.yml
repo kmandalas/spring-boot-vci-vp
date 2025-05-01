@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: demo-issuer
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://192.168.1.65:9000
+
+app:
+  metadata:
+    endpoints:
+      issuer: http://192.168.1.65:8080
+      authorization: http://192.168.1.65:9000
+      credential: http://192.168.1.65/credential
+    claims:
+      audience: http://192.168.1.65:8080
+      vct: "urn:eu.europa.ec.eudi:pda1:1"
+      iss: http://192.168.1.65/credential
+
+---
+spring:
+  config:
+    activate:
+      on-profile: production
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://vc-auth-server.onrender.com
+
+app:
+  metadata:
+    endpoints:
+      issuer: https://vc-issuer.onrender.com
+      authorization: https://vc-auth-server.onrender.com
+      credential: https://vc-issuer.onrender.com/credential
+    claims:
+      audience: https://vc-issuer.onrender.com
+      vct: "urn:eu.europa.ec.eudi:pda1:1"
+      iss: https://vc-issuer.onrender.com/credential

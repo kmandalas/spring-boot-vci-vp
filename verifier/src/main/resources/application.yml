@@ -1,0 +1,24 @@
+server:
+  port: 9002
+
+spring:
+  application:
+    name: verifier
+
+app:
+  request-uri-store: http://192.168.1.65:9002/verifier/request-object/
+  deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
+  issuer-jwks-url: http://192.168.1.65:8080/.well-known/jwks.json
+  response-uri: http://192.168.1.65:9002/verifier/verify-vp
+
+---
+spring:
+  config:
+    activate:
+      on-profile: production
+
+app:
+  request-uri-store: https://vp-verifier.onrender.com/verifier/request-object/
+  deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
+  issuer-jwks-url: https://vc-issuer.onrender.com/.well-known/jwks.json
+  response-uri: https://vp-verifier.onrender.com/verifier/verify-vp
