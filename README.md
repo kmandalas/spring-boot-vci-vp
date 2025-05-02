@@ -78,6 +78,8 @@ Sample (demo):
 }
 ```
 
+---
+
 ## VP
 
 ### Same Device Flow (our demo) 🧪
