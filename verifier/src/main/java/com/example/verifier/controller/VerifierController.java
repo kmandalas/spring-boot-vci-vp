@@ -185,6 +185,7 @@ public class VerifierController {
             SDJWT vp = SDJWT.parse(vpToken);
 
             // Step 2: Fetch Issuer’s Public Key (for SD-JWT validation)
+            // Could be also retrieved from "iss" claim of the payload
             JWKSet issuerJwkSet = JWKSet.load(new URL(appConfig.getIssuerJwksUrl()));
             JWK issuerPublicKey = issuerJwkSet.getKeys().get(0);
 
