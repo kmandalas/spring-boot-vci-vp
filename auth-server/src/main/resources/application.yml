@@ -18,9 +18,9 @@ spring:
 spring:
   config:
     activate:
-      on-profile: production
+      on-profile: cloud
 
   security:
     oauth2:
       authorizationserver:
-        issuer: https://vc-auth-server.onrender.com
+        issuer: https://vc-auth-server.kmandalas.com

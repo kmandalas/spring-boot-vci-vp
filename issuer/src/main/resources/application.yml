@@ -23,21 +23,21 @@ app:
 spring:
   config:
     activate:
-      on-profile: production
+      on-profile: cloud
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: https://vc-auth-server.onrender.com
+          issuer-uri: https://vc-auth-server.kmandalas.com
 
 app:
   metadata:
     endpoints:
-      issuer: https://vc-issuer.onrender.com
-      authorization: https://vc-auth-server.onrender.com
-      credential: https://vc-issuer.onrender.com/credential
+      issuer: https://vc-issuer.kmandalas.com
+      authorization: https://vc-auth-server.kmandalas.com
+      credential: https://vc-issuer.kmandalas.com/credential
     claims:
-      audience: https://vc-issuer.onrender.com
+      audience: https://vc-issuer.kmandalas.com
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: https://vc-issuer.onrender.com/credential
+      iss: https://vc-issuer.kmandalas.com/credential

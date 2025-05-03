@@ -37,8 +37,14 @@ public class VerifierController {
             String requestId = UUID.randomUUID().toString();
             String requestUri = appConfig.getRequestUriStore() + requestId;
 
-            // Step 2: Create Authorization Request with Nested Presentation Definition
-            // client_id = Verifier identifier (URI or DID). This value must be present in "sub" field of the VP JWT.
+            /*
+             * Step 2: Create Authorization Request with Nested Presentation Definition
+             *
+             * - note: `client_id`: Verifier identifier (URI or DID). This must match the "sub" field in the VP JWT.
+             * - todo: Since `request_uri` is present, the authorization request is passed by reference (per JAR = JWT-Secured Authorization Request).
+             *     - The `request_uri` must be dereferenced to retrieve the JWT.
+             *     - The JWT will contain the required claims as outlined below.
+             */
             Map<String, Object> authorizationRequest = Map.of(
                     "client_id", "verifier-backend.eudiw.cgn",
                     "response_type", "vp_token",
@@ -144,7 +150,7 @@ public class VerifierController {
     }
 
     /**
-     * Serves pre-stored Presentation Definitions (for Cross-Device Flow?)
+     * Serves pre-stored Presentation Definitions (for Cross-Device Flow only?)
      */
     @GetMapping("/request-object/{requestId}")
     public ResponseEntity<String> getRequestObject(@PathVariable String requestId) {

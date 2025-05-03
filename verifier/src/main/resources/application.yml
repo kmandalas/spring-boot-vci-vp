@@ -15,10 +15,10 @@ app:
 spring:
   config:
     activate:
-      on-profile: production
+      on-profile: cloud
 
 app:
-  request-uri-store: https://vp-verifier.onrender.com/verifier/request-object/
+  request-uri-store: https://vp-verifier.kmandalas.com/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: https://vc-issuer.onrender.com/.well-known/jwks.json
-  response-uri: https://vp-verifier.onrender.com/verifier/verify-vp
+  issuer-jwks-url: https://vc-issuer.kmandalas.com/.well-known/jwks.json
+  response-uri: https://vp-verifier.kmandalas.com/verifier/verify-vp
