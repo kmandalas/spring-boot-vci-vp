@@ -46,37 +46,16 @@ sequenceDiagram
 #### SD-JWT
 
 Sample (demo):
-```json
-{
-  "header": {
-    "kid": "issuer-key-1",
-    "typ": "vc+sd-jwt",
-    "alg": "ES256"
-  },
-  "payload": {
-    "iss": "http://192.168.1.65/credential",
-    "_sd": [
-      "EJT8C5zfV-QWrfzMKm2MZUxkSsMSgVi5QdXo22_auVA",
-      "HBwkSiyrN0oHG_MW00nXVV_MfdBYhY99cxgHr607gVA",
-      "op7guSnSoMvU7uwxDUxcqgHs12zTWEe4a0dz2wFbBww"
-    ],
-    "cnf": {
-      "jwk": {
-        "kty": "EC",
-        "crv": "P-256",
-        "kid": "wallet-key",
-        "x": "QTlLRY-fTWEqBZ7B_1vbCKjTBTf9aanzunprNTod45U",
-        "y": "8uhjYCn9XR9YTLZiNqs8nHZWAzmNg2DDnPhLXect9Cg",
-        "alg": "ES256"
-      }
-    },
-    "company": "AdminCorp",
-    "iat": 1746134429,
-    "vct": "urn:eu.europa.ec.eudi:pda1:1"
-  },
-  "signature": "WjoZuc7lp5lZuIiPzHHO1682T7IyEFuVimlphkh3RXcTwMykH27-aaEe82bSZ1k1e8RATUIiIOlLbV4BcKRzOQ"
-}
 ```
+eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xLjY1L2NyZWRlbnRpYWwiLCJfc2QiOlsiVTdHSWJoLTl0NHlockhxZHN0OHp5bzdac1lyNmtRM2pnc2NCY1R1c21YVSIsIlhGT2V6WFpVZXBpOEZpQ3R0dFNoZVIzcEFYRE4tQXdnTC1MV0p2eldUX00iLCJicDk3WnlhOEtQR0tfYmtvUmRabHhSVDN4aklTcXJoeGVONVdZUlNleWhNIl0sImNuZiI6eyJqd2siOnsia3R5IjoiRUMiLCJjcnYiOiJQLTI1NiIsImtpZCI6IndhbGxldC1rZXkiLCJ4IjoiUE5CYS1hS1AyTnAteU1PZkpOZ0JUY1Bvc3Z1MUUyM0o4SE5DR1VPLUhYdyIsInkiOiJLNDlqbDFNU1A0OUo2bHhLcExpRGt4YU1ZLUVSYnZOX1NlclhqZW85SlowIiwiYWxnIjoiRVMyNTYifX0sImNvbXBhbnkiOiJVc2VyQ29ycCIsImlhdCI6MTc0NjIyMjcyNywidmN0IjoidXJuOmV1LmV1cm9wYS5lYy5ldWRpOnBkYTE6MSJ9.NoLijxtEQVO9mZRK4b6vSb5jdcggQ5X8so8K9XKy8uOtDnSMQssGg0Y-YLKO-EcLH6IA1GacbSlJtl39IeESMg~WyJRd2xtMU4tQXBLOUlEQUxSZ25kM0dnIiwiY3JlZGVudGlhbF9ob2xkZXIiLCJOaWtvcyBUZXN0b3BvdWxvcyJd~WyJ6a3BiTDBVcDNPYzRxeFkza1EtaTdRIiwibmF0aW9uYWxpdHkiLCJHcmVlayDwn4es8J-HtyJd~WyJtdjVGT09SbDF3ZXZWQnRQR2t4NkdBIiwiY29tcGV0ZW50X2luc3RpdHV0aW9uIiwiRU9QWVkiXQ~
+```
+
+---
+
+## Demo wallet app (Android)
+
+Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions.
+Additionally, you can watch a screen recording that walks through the entire flow on [YouTube](https://youtube.com/shorts/MdCZgKa_sEE).
 
 ---
 
@@ -173,7 +152,13 @@ Sample (demo):
     "logo_uri": "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120"
   }
 }
+```
 
+#### vp_token
+
+Sample (demo):
+```
+eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xLjY1L2NyZWRlbnRpYWwiLCJfc2QiOlsiVTdHSWJoLTl0NHlockhxZHN0OHp5bzdac1lyNmtRM2pnc2NCY1R1c21YVSIsIlhGT2V6WFpVZXBpOEZpQ3R0dFNoZVIzcEFYRE4tQXdnTC1MV0p2eldUX00iLCJicDk3WnlhOEtQR0tfYmtvUmRabHhSVDN4aklTcXJoeGVONVdZUlNleWhNIl0sImNuZiI6eyJqd2siOnsia3R5IjoiRUMiLCJjcnYiOiJQLTI1NiIsImtpZCI6IndhbGxldC1rZXkiLCJ4IjoiUE5CYS1hS1AyTnAteU1PZkpOZ0JUY1Bvc3Z1MUUyM0o4SE5DR1VPLUhYdyIsInkiOiJLNDlqbDFNU1A0OUo2bHhLcExpRGt4YU1ZLUVSYnZOX1NlclhqZW85SlowIiwiYWxnIjoiRVMyNTYifX0sImNvbXBhbnkiOiJVc2VyQ29ycCIsImlhdCI6MTc0NjIyMjcyNywidmN0IjoidXJuOmV1LmV1cm9wYS5lYy5ldWRpOnBkYTE6MSJ9.NoLijxtEQVO9mZRK4b6vSb5jdcggQ5X8so8K9XKy8uOtDnSMQssGg0Y-YLKO-EcLH6IA1GacbSlJtl39IeESMg~WyJRd2xtMU4tQXBLOUlEQUxSZ25kM0dnIiwiY3JlZGVudGlhbF9ob2xkZXIiLCJOaWtvcyBUZXN0b3BvdWxvcyJd~WyJtdjVGT09SbDF3ZXZWQnRQR2t4NkdBIiwiY29tcGV0ZW50X2luc3RpdHV0aW9uIiwiRU9QWVkiXQ~eyJraWQiOiJ3YWxsZXQta2V5IiwidHlwIjoia2Irand0IiwiYWxnIjoiRVMyNTYifQ.eyJzZF9oYXNoIjoiUmlrT1ExeUk2VDlQamVEd0MzdFFHV3lwU1lrbUNySHN4aXpvY0w2VmRBWSIsImF1ZCI6Imh0dHBzOi8vdmVyaWZpZXIuZXhhbXBsZS5jb20iLCJpYXQiOjE3NDYyMjQ1MjQsIm5vbmNlIjoiZTJjMWQ4ZjEtZmZjMS00NDEyLTg3MWQtOTRhNGJjMTRhNmI1In0.4EeRKGOA5Kbr0UeOkhW6e5yft4Z785DefnLfnDf-6S21a9-3nCo3Rbvl_TRhOr-yB_dRp_h2bUafVtbQItelwg
 ```
 
 #### QR code and Button URL
