@@ -56,7 +56,7 @@ eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3M
 ## Demo wallet app (Android)
 
 Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions.
-Additionally, you can watch a screen recording that walks through the entire flow on [YouTube](https://youtube.com/shorts/MdCZgKa_sEE).
+Additionally, you can watch a screen recording that walks through the entire flow on [YouTube](https://youtube.com/shorts/RfefiWf3iFI).
 
 ---
 
