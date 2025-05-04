@@ -51,6 +51,8 @@ eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3M
 ```
 💡 Paste it on https://www.sdjwt.co for inspection.
 
+![sdjwt.png](sdjwt.png)
+
 ---
 
 ## Demo wallet app (Android)
@@ -163,6 +165,8 @@ eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3M
 ```
 
 💡 Paste it on https://www.sdjwt.co for inspection.
+
+![vptoken.png](vptoken.png)
 
 #### QR code and Button URL
 
