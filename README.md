@@ -179,6 +179,6 @@ openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=http%3A%2F%2F192.1
 <details>
 <summary>⚠️ Disclaimer</summary>
 
-This article describes an **experimental project** created for learning and demonstration purposes. The implementation is **not intended for production** use.
+This repo contains an **experimental project** created for learning and demonstration purposes. The implementation is **not intended for production** use.
 
 </details>
