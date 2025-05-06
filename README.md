@@ -175,3 +175,10 @@ Sample (demo):
 openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=http%3A%2F%2F192.168.1.65%3A9002%2Fverifier%2Frequest-object%2Fd2858230-7302-489a-9c24-09728d4fe2f3/
 ```
 
+---
+<details>
+<summary>⚠️ Disclaimer</summary>
+
+This article describes an **experimental project** created for learning and demonstration purposes. The implementation is **not intended for production** use.
+
+</details>
