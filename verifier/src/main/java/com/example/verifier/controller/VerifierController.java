@@ -104,7 +104,7 @@ public class VerifierController {
             return ResponseEntity.ok("""
                 <html>
                 <head>
-                    <title>Cognity VCI-VP demo</title>
+                    <title>Demo Verifier Inc. VCI-VP demo</title>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
                     <style>
                         body {
