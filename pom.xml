@@ -21,6 +21,7 @@
         <module>auth-server</module>
         <module>issuer</module>
         <module>verifier</module>
+        <module>wallet-provider</module>
     </modules>
 
 </project>

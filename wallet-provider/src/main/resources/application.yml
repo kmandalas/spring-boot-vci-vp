@@ -1,0 +1,70 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: wallet-provider
+
+  datasource:
+    url: jdbc:h2:file:./data/walletprovider;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+wp:
+  metadata:
+    endpoints:
+      issuer: http://192.168.1.67:9001/wp
+      credential: http://192.168.1.67:9001/wp/wua/credential
+      jwks: http://192.168.1.67:9001/wp/jwks
+      status: http://192.168.1.67:9001/wp/wua/status
+    claims:
+      audience: http://192.168.1.67:9001/wp
+      iss: http://192.168.1.67:9001/wp
+    provider:
+      id: demo.wallet.provider
+      name: Demo Wallet Provider
+      solution-version: 1.0.0
+    time:
+      nonce-ttl-seconds: 300
+      max-proof-age-seconds: 300
+      wua-ttl-seconds: 86400
+  attestation:
+    # Set to true to skip Google root CA validation (for emulator testing)
+    skip-chain-validation: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+
+  datasource:
+    url: jdbc:h2:file:./data/walletprovider-cloud;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE
+
+wp:
+  metadata:
+    endpoints:
+      issuer: https://wallet-provider.onrender.com/wp
+      credential: https://wallet-provider.onrender.com/wp/wua/credential
+      jwks: https://wallet-provider.onrender.com/wp/jwks
+      status: https://wallet-provider.onrender.com/wp/wua/status
+    claims:
+      audience: https://wallet-provider.onrender.com/wp
+      iss: https://wallet-provider.onrender.com/wp
+  attestation:
+    # Production: always validate certificate chain
+    skip-chain-validation: false
