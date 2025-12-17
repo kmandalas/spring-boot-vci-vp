@@ -1,7 +1,7 @@
 package com.example.walletprovider.service;
 
 import com.example.walletprovider.config.WpMetadataConfig;
-import com.example.walletprovider.entity.WalletUnitAttestation;
+import com.example.walletprovider.model.WalletUnitAttestation;
 import com.example.walletprovider.model.KeyAttestationData;
 import com.example.walletprovider.model.WuaCredentialRequest;
 import com.example.walletprovider.repository.WuaRepository;

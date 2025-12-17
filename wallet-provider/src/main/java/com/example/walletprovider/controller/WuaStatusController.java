@@ -1,6 +1,6 @@
 package com.example.walletprovider.controller;
 
-import com.example.walletprovider.entity.WalletUnitAttestation;
+import com.example.walletprovider.model.WalletUnitAttestation;
 import com.example.walletprovider.repository.WuaRepository;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,12 +32,12 @@ public class WuaStatusController {
         WalletUnitAttestation wua = wuaOpt.get();
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("wua_id", wua.getWuaId().toString());
-        response.put("status", wua.getStatus().name().toLowerCase());
-        response.put("wscd_type", wua.getWscdType());
-        response.put("wscd_security_level", wua.getWscdSecurityLevel());
-        response.put("issued_at", wua.getIssuedAt().toString());
-        response.put("expires_at", wua.getExpiresAt().toString());
+        response.put("wua_id", wua.wuaId().toString());
+        response.put("status", wua.status().toLowerCase());
+        response.put("wscd_type", wua.wscdType());
+        response.put("wscd_security_level", wua.wscdSecurityLevel());
+        response.put("issued_at", wua.issuedAt().toString());
+        response.put("expires_at", wua.expiresAt().toString());
 
         return ResponseEntity.ok(response);
     }

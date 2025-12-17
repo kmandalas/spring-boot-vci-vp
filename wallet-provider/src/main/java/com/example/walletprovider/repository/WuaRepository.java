@@ -1,16 +1,51 @@
 package com.example.walletprovider.repository;
 
-import com.example.walletprovider.entity.WalletUnitAttestation;
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.example.walletprovider.model.WalletUnitAttestation;
+import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface WuaRepository extends JpaRepository<WalletUnitAttestation, UUID> {
+public class WuaRepository {
 
-    Optional<WalletUnitAttestation> findByWalletPublicKeyThumbprint(String thumbprint);
+    private final JdbcClient jdbcClient;
 
-    boolean existsByWalletPublicKeyThumbprint(String thumbprint);
+    public WuaRepository(JdbcClient jdbcClient) {
+        this.jdbcClient = jdbcClient;
+    }
+
+    public void save(WalletUnitAttestation wua) {
+        jdbcClient.sql("""
+            INSERT INTO wallet_unit_attestations
+            (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at)
+            VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt)
+            """)
+            .paramSource(new BeanPropertySqlParameterSource(wua))
+            .update();
+    }
+
+    public Optional<WalletUnitAttestation> findById(UUID wuaId) {
+        return jdbcClient.sql("SELECT * FROM wallet_unit_attestations WHERE wua_id = :wuaId")
+            .param("wuaId", wuaId)
+            .query(WalletUnitAttestation.class)
+            .optional();
+    }
+
+    public Optional<WalletUnitAttestation> findByWalletPublicKeyThumbprint(String thumbprint) {
+        return jdbcClient.sql("SELECT * FROM wallet_unit_attestations WHERE wallet_public_key_thumbprint = :thumbprint")
+            .param("thumbprint", thumbprint)
+            .query(WalletUnitAttestation.class)
+            .optional();
+    }
+
+    public boolean existsByWalletPublicKeyThumbprint(String thumbprint) {
+        return jdbcClient.sql("SELECT 1 FROM wallet_unit_attestations WHERE wallet_public_key_thumbprint = :thumbprint LIMIT 1")
+            .param("thumbprint", thumbprint)
+            .query(Integer.class)
+            .optional()
+            .isPresent();
+    }
 }
