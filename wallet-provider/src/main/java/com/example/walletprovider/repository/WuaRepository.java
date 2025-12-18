@@ -1,7 +1,6 @@
 package com.example.walletprovider.repository;
 
 import com.example.walletprovider.model.WalletUnitAttestation;
-import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -23,7 +22,13 @@ public class WuaRepository {
             (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at)
             VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt)
             """)
-            .paramSource(new BeanPropertySqlParameterSource(wua))
+            .param("wuaId", wua.wuaId())
+            .param("walletPublicKeyThumbprint", wua.walletPublicKeyThumbprint())
+            .param("status", wua.status())
+            .param("wscdType", wua.wscdType())
+            .param("wscdSecurityLevel", wua.wscdSecurityLevel())
+            .param("issuedAt", wua.issuedAt())
+            .param("expiresAt", wua.expiresAt())
             .update();
     }
 
