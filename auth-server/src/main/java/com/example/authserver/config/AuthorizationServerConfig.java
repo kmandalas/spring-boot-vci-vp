@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -30,12 +31,32 @@ import static org.springframework.security.oauth2.server.authorization.settings.
 @Configuration
 public class AuthorizationServerConfig {
 
-    @Order(1)
     @Bean
+    @Order(1)
+    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+                OAuth2AuthorizationServerConfigurer.authorizationServer();
+
+        http
+            .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
+            .with(authorizationServerConfigurer, authServer -> authServer
+                .oidc(Customizer.withDefaults())
+            )
+            .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+            // Redirect to login page when not authenticated
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.with(new OAuth2AuthorizationServerConfigurer(), Customizer.withDefaults());
-        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).oidc(oidc -> {});
-        http.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated()).formLogin(withDefaults());
+        http
+            .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+            .formLogin(withDefaults());
 
         return http.build();
     }
@@ -47,6 +68,8 @@ public class AuthorizationServerConfig {
                 .clientId("wallet-client")
                 .clientSecret("{noop}wallet-secret")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                // Public client support for mobile wallets (no client secret, uses PKCE + DPoP)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUris(uris -> uris.addAll(redirectUris))
                 .scope("VerifiablePortableDocumentA1")
@@ -54,9 +77,11 @@ public class AuthorizationServerConfig {
                         .accessTokenFormat(SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(15))
                         .authorizationCodeTimeToLive(Duration.ofMinutes(2))
+                        // DPoP is handled automatically by Spring when client sends DPoP header
+                        // Token will include cnf.jkt claim binding it to the DPoP key
                         .build())
                 .clientSettings(ClientSettings.builder()
-                        .requireProofKey(true)
+                        .requireProofKey(true)  // PKCE required (S256)
                         .requireAuthorizationConsent(true)
                         .build())
                 .build();
