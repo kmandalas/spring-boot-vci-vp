@@ -7,6 +7,7 @@ import com.example.issuer.config.AppMetadataConfig;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory;
 import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.util.Base64;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.springframework.stereotype.Component;
@@ -20,19 +21,26 @@ public class AuthleteHelper {
 
     private final AppMetadataConfig appMetadataConfig;
     private final AuthSourceHelper authSourceHelper;
+    private final IssuerSigningService issuerSigningService;
 
-    public AuthleteHelper(AppMetadataConfig appMetadataConfig, AuthSourceHelper authSourceHelper) {
+    public AuthleteHelper(AppMetadataConfig appMetadataConfig, AuthSourceHelper authSourceHelper,
+                          IssuerSigningService issuerSigningService) {
         this.appMetadataConfig = appMetadataConfig;
         this.authSourceHelper = authSourceHelper;
+        this.issuerSigningService = issuerSigningService;
     }
 
-    public SDJWT createVC(JWK issuerKey, JWK walletKey, String userIdentifier) throws JOSEException, ParseException {
+    public SDJWT createVC(JWK walletKey, String userIdentifier) throws JOSEException, ParseException {
         Map<String, Object> claims = authSourceHelper.getNormalClaims(userIdentifier);
         List<Disclosure> disclosableClaims = authSourceHelper.getDisclosableClaims(userIdentifier);
 
+        // Get signing key and x5c from the signing service
+        JWK signingKey = issuerSigningService.getSigningKey();
+        List<Base64> x5cChain = issuerSigningService.getX5cChain();
+
         // Create a credential JWT, which is part of an SD-JWT.
         SignedJWT credentialJwt = createCredentialJwt(
-                claims, disclosableClaims, issuerKey, walletKey);
+                claims, disclosableClaims, signingKey, walletKey, x5cChain);
 
         // Create a verifiable credential in the SD-JWT format.
         return new SDJWT(credentialJwt.serialize(), disclosableClaims);
@@ -40,10 +48,10 @@ public class AuthleteHelper {
 
     private SignedJWT createCredentialJwt(
             Map<String, Object> claims, List<Disclosure> disclosableClaims,
-            JWK signingKey, JWK bindingKey) throws ParseException, JOSEException {
+            JWK signingKey, JWK bindingKey, List<Base64> x5cChain) throws ParseException, JOSEException {
 
-        // Create the header part of a credential JWT.
-        JWSHeader header = createCredentialJwtHeader(signingKey);
+        // Create the header part of a credential JWT with x5c.
+        JWSHeader header = createCredentialJwtHeader(signingKey, x5cChain);
 
         // Create the payload part of a credential JWT.
         Map<String, Object> payload = createCredentialJwtPayload(claims, disclosableClaims, bindingKey);
@@ -60,12 +68,13 @@ public class AuthleteHelper {
         return jwt;
     }
 
-    private JWSHeader createCredentialJwtHeader(JWK signingKey) {
+    private JWSHeader createCredentialJwtHeader(JWK signingKey, List<Base64> x5cChain) {
         JWSAlgorithm alg = JWSAlgorithm.parse(signingKey.getAlgorithm().getName());
         String kid = signingKey.getKeyID();
 
         return new JWSHeader.Builder(alg).keyID(kid)
-                .type(new JOSEObjectType("vc+sd-jwt")) // todo
+                .type(new JOSEObjectType("dc+sd-jwt"))
+                .x509CertChain(x5cChain)
                 .build();
     }
 

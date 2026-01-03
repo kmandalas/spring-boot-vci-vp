@@ -27,7 +27,7 @@ public class IssuerMetadataController {
                 "credential_endpoint", appMetadataConfig.getEndpoints().getCredential(),
                 "credential_configurations_supported", Map.of(
                         "VerifiablePortableDocumentA1", Map.of(
-                                "format", "vc+sd-jwt",
+                                "format", "dc+sd-jwt",
                                 "scope", "VerifiablePortableDocumentA1",
                                 "proof_types_supported", List.of("jwt")
                         )

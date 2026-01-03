@@ -4,12 +4,19 @@ server:
 spring:
   application:
     name: verifier
+  ssl:
+    bundle:
+      pem:
+        verifier-signing:
+          keystore:
+            certificate: classpath:verifier_cert.pem
+            private-key: classpath:verifier_key.pem
 
 app:
-  request-uri-store: http://192.168.1.65:9002/verifier/request-object/
+  request-uri-store: http://192.168.1.67:9002/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: http://192.168.1.65:8080/.well-known/jwks.json
-  response-uri: http://192.168.1.65:9002/verifier/verify-vp
+  issuer-jwks-url: http://192.168.1.67:8080/.well-known/jwks.json
+  response-uri: http://192.168.1.67:9002/verifier/verify-vp
 
 ---
 spring:

@@ -15,12 +15,7 @@ import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.text.ParseException;
@@ -37,9 +32,6 @@ public class CredentialIssuerService {
     private static final long MAX_PROOF_AGE_SECONDS = 300;
 
     private final Set<String> usedNonces = ConcurrentHashMap.newKeySet();
-
-    @Value("classpath:/issuer_key.json")
-    private Resource issuerKeyResource;
 
     private final AuthleteHelper authleteHelper;
 
@@ -173,25 +165,17 @@ public class CredentialIssuerService {
     }
 
     // Issuance
-    public String generateSdJwt(JWK walletKey, String userIdentifier) throws JOSEException, ParseException, IOException {
-        // Step 1: Load issuer's key
-        JWK issuerKey = loadIssuerKey();
-
-        // Step 2: Ensure wallet key is provided
+    public String generateSdJwt(JWK walletKey, String userIdentifier) throws JOSEException, ParseException {
+        // Step 1: Ensure wallet key is provided
         if (walletKey == null) {
             throw new IllegalArgumentException("Wallet key is required for SD-JWT issuance.");
         }
 
-        // Step 3: Create SD-JWT Verifiable Credential
-        SDJWT sdJwt = authleteHelper.createVC(issuerKey, walletKey.toPublicJWK(), userIdentifier);
+        // Step 2: Create SD-JWT Verifiable Credential (signing key loaded via IssuerSigningService)
+        SDJWT sdJwt = authleteHelper.createVC(walletKey.toPublicJWK(), userIdentifier);
 
-        // Step 4: Return serialized SD-JWT
+        // Step 3: Return serialized SD-JWT
         return sdJwt.toString();
-    }
-
-    private JWK loadIssuerKey() throws IOException, ParseException {
-        String keyJson = new String(issuerKeyResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        return JWK.parse(keyJson);
     }
 
 }

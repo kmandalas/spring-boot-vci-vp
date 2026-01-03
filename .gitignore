@@ -36,5 +36,5 @@ build/
 
 ### Other ###
 credential_response.json
-*.pem
 notes/
+data/

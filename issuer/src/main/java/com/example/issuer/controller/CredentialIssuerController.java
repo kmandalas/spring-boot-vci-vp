@@ -55,7 +55,7 @@ public class CredentialIssuerController {
 
         // Prepare response according to the spec
         Map<String, Object> response = Map.of(
-                "format", "vc+sd-jwt",
+                "format", "dc+sd-jwt",
                 "credential", sdJwt
         );
 
