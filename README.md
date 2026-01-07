@@ -45,7 +45,7 @@ sequenceDiagram
     WalletApp->>WalletApp: Save credentials in Encrypted Shared Preferences
 ```
 
-
+![vci-auth-code-flow.png](vci-auth-code-flow.png)
 
 #### SD-JWT
 
@@ -105,8 +105,7 @@ sequenceDiagram
     W ->> W: Display verification outcome
 ```
 
-
-
+![vp-same-device-flow.png](vp-same-device-flow.png)
 
 ### DCQL Query
 
