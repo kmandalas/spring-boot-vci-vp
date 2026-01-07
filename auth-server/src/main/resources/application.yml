@@ -12,7 +12,7 @@ spring:
   security:
     oauth2:
       authorizationserver:
-        issuer: http://192.168.1.67:9000
+        issuer: http://${LOCAL_IP:localhost}:9000
 
 ---
 spring:

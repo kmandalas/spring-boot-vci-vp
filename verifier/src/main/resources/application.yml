@@ -13,10 +13,10 @@ spring:
             private-key: classpath:verifier_key.pem
 
 app:
-  request-uri-store: http://192.168.1.67:9002/verifier/request-object/
+  request-uri-store: http://${LOCAL_IP:localhost}:9002/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: http://192.168.1.67:8080/.well-known/jwks.json
-  response-uri: http://192.168.1.67:9002/verifier/verify-vp
+  issuer-jwks-url: http://${LOCAL_IP:localhost}:8080/.well-known/jwks.json
+  response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
 
 ---
 spring:

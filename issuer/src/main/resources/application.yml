@@ -14,7 +14,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://192.168.1.67:9000
+          issuer-uri: http://${LOCAL_IP:localhost}:9000
 
 logging:
   level:
@@ -24,13 +24,13 @@ logging:
 app:
   metadata:
     endpoints:
-      issuer: http://192.168.1.67:8080
-      authorization: http://192.168.1.67:9000
-      credential: http://192.168.1.67/credential
+      issuer: http://${LOCAL_IP:localhost}:8080
+      authorization: http://${LOCAL_IP:localhost}:9000
+      credential: http://${LOCAL_IP:localhost}/credential
     claims:
-      audience: http://192.168.1.67:8080
+      audience: http://${LOCAL_IP:localhost}:8080
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: http://192.168.1.67/credential
+      iss: http://${LOCAL_IP:localhost}/credential
 
 ---
 spring:
