@@ -68,16 +68,16 @@ public class CredentialIssuerService {
 
     // Validation
     public JWK validateCredentialRequest(CredentialRequest request) {
-        if (request == null || request.getProof() == null || request.getProof().getJwt() == null) {
+        if (request == null || request.proof() == null || request.proof().jwt() == null) {
             return null;
         }
 
         // Check that proof type is "jwt"
-        if (!"jwt".equals(request.getProof().getProofType())) {
+        if (!"jwt".equals(request.proof().proofType())) {
             return null;
         }
 
-        String proofJwt = request.getProof().getJwt();
+        String proofJwt = request.proof().jwt();
         return validateProof(proofJwt);
     } // todo - check also format, credentialConfigurationId?
 
