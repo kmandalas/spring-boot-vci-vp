@@ -14,12 +14,16 @@ public class ResourceServerConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/.well-known/openid-credential-issuer").permitAll() // Allow public access
-                        .requestMatchers("/.well-known/jwks.json").permitAll() // Allow public access
-                        .requestMatchers("/wallet/register").permitAll() // Allow public access
-                        .anyRequest().authenticated() // Protect all other endpoints
+                        .requestMatchers("/.well-known/openid-credential-issuer").permitAll()
+                        .requestMatchers("/.well-known/jwks.json").permitAll()
+                        .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                // Spring Security 6.5+ has built-in DPoP support enabled by default
+                // It automatically handles: DPoP scheme extraction, proof validation,
+                // ath claim verification, and cnf.jkt binding verification
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(Customizer.withDefaults() )
+                );
 
         return http.build();
     }
