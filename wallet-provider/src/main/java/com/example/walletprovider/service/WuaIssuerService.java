@@ -17,17 +17,12 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertificateException;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -40,18 +35,17 @@ public class WuaIssuerService {
 
     private final Set<String> usedNonces = ConcurrentHashMap.newKeySet();
 
-    @Value("classpath:/wp_key.json")
-    private Resource wpKeyResource;
-
     private final WpMetadataConfig wpMetadataConfig;
     private final WuaRepository wuaRepository;
     private final KeyAttestationService keyAttestationService;
+    private final WpSigningService wpSigningService;
 
     public WuaIssuerService(WpMetadataConfig wpMetadataConfig, WuaRepository wuaRepository,
-                           KeyAttestationService keyAttestationService) {
+                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService) {
         this.wpMetadataConfig = wpMetadataConfig;
         this.wuaRepository = wuaRepository;
         this.keyAttestationService = keyAttestationService;
+        this.wpSigningService = wpSigningService;
     }
 
     public String generateNonce() {
@@ -94,7 +88,7 @@ public class WuaIssuerService {
     }
 
     public WuaIssuanceResult issueWua(JWK walletKey, KeyAttestationData attestationData)
-            throws JOSEException, IOException, ParseException {
+            throws JOSEException {
 
         UUID wuaId = UUID.randomUUID();
         Instant issuedAt = Instant.now();
@@ -123,14 +117,15 @@ public class WuaIssuerService {
 
     private String generateWuaJwt(UUID wuaId, JWK walletKey, KeyAttestationData attestationData,
                                    Instant issuedAt, Instant expiresAt)
-            throws JOSEException, IOException, ParseException {
+            throws JOSEException {
 
-        JWK wpKey = loadWpKey();
+        ECKey wpKey = wpSigningService.getSigningKey();
 
-        // Build header
+        // Build header with x5c certificate chain
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
                 .keyID(wpKey.getKeyID())
                 .type(new JOSEObjectType("wua+jwt"))
+                .x509CertChain(wpSigningService.getX5cChain())
                 .build();
 
         // Build claims per ARF TS3
@@ -178,7 +173,7 @@ public class WuaIssuerService {
 
         // Sign JWT
         SignedJWT signedJWT = new SignedJWT(header, claims);
-        JWSSigner signer = new ECDSASigner((ECKey) wpKey);
+        JWSSigner signer = new ECDSASigner(wpKey);
         signedJWT.sign(signer);
 
         return signedJWT.serialize();
@@ -301,11 +296,6 @@ public class WuaIssuerService {
         } catch (JOSEException e) {
             throw new CertificateException("Error comparing keys", e);
         }
-    }
-
-    private JWK loadWpKey() throws IOException, ParseException {
-        String keyJson = new String(wpKeyResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        return JWK.parse(keyJson);
     }
 
     public record WuaIssuanceResult(String wuaJwt, UUID wuaId) {}

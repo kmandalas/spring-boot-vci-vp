@@ -9,18 +9,24 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.util.Base64;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.example.issuer.config.WalletProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayInputStream;
 import java.net.URL;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.text.ParseException;
@@ -194,42 +200,40 @@ public class CredentialIssuerService {
             // 3. Derive JWKS URL from issuer and fetch Wallet Provider's public key
             String jwksUrl = wuaIssuer + "/.well-known/jwks.json";
             JWKSet wpJwkSet = JWKSet.load(new URL(jwksUrl));
-            JWK wpPublicKey = wpJwkSet.getKeys().get(0);
+            JWK wpJwksKey = wpJwkSet.getKeys().get(0);
 
-            if (!verifySignatureWithProvidedJwk(wuaJwt, wpPublicKey)) {
+            // 4. Extract x5c from WUA header and cross-check with JWKS (if present)
+            JWK x5cKey = extractKeyFromX5c(wuaJwt);
+            if (x5cKey != null) {
+                if (!keysMatch(wpJwksKey, x5cKey)) {
+                    logger.warn("WUA x5c key does not match Wallet Provider JWKS - possible tampering");
+                    return null;
+                }
+                logger.debug("WUA x5c key matches JWKS key - cross-check passed");
+            } else {
+                logger.debug("No x5c in WUA header, using JWKS key only");
+            }
+
+            // 5. Verify WUA signature
+            if (!verifySignatureWithProvidedJwk(wuaJwt, wpJwksKey)) {
                 logger.warn("WUA signature verification failed");
                 return null;
             }
             logger.debug("WUA signature verified successfully");
 
-            // 4. Check WSCD type policy
-            Map<String, Object> eudiWalletInfo = (Map<String, Object>) wuaClaims.getClaim("eudi_wallet_info");
-            if (eudiWalletInfo != null) {
-                Map<String, Object> keyStorageInfo = (Map<String, Object>) eudiWalletInfo.get("key_storage_info");
-                if (keyStorageInfo != null) {
-                    Map<String, Object> storageCertInfo = (Map<String, Object>) keyStorageInfo.get("storage_certification_information");
-                    if (storageCertInfo != null) {
-                        String wscdType = (String) storageCertInfo.get("wscd_type");
-                        String securityLevel = (String) storageCertInfo.get("security_level");
-                        logger.info("WUA WSCD type: {}, security level: {}", wscdType, securityLevel);
-
-                        if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
-                            logger.warn("WSCD type '{}' not allowed by policy (allowed: {})",
-                                    wscdType, walletProviderConfig.getAllowedWscdTypes());
-                            return null;
-                        }
-                    }
-                }
+            // 6. Check WSCD type policy
+            if (!isWscdTypePolicyCompliant(wuaClaims)) {
+                return null;
             }
 
-            // 5. Extract attested_keys array from WUA
+            // 7. Extract attested_keys array from WUA
             List<Map<String, Object>> attestedKeys = (List<Map<String, Object>>) wuaClaims.getClaim("attested_keys");
             if (attestedKeys == null || attestedKeys.isEmpty()) {
                 logger.warn("No attested_keys in WUA");
                 return null;
             }
 
-            // 6. Use kid from JWT proof header to index into attested_keys
+            // 8. Use kid from JWT proof header to index into attested_keys
             String kid = outerHeader.getKeyID();
             int keyIndex = 0;
             if (kid != null) {
@@ -245,7 +249,7 @@ public class CredentialIssuerService {
                 return null;
             }
 
-            // 7. Parse and return the JWK
+            // 9. Parse and return the JWK
             Map<String, Object> keyMap = attestedKeys.get(keyIndex);
             JWK walletJwk = JWK.parse(keyMap);
             logger.debug("Extracted wallet key from WUA attested_keys[{}]", keyIndex);
@@ -278,6 +282,87 @@ public class CredentialIssuerService {
             e.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * Extracts the public key from the x5c certificate chain in the JWT header.
+     * Returns null if no x5c is present.
+     */
+    private JWK extractKeyFromX5c(SignedJWT signedJWT) {
+        try {
+            List<Base64> x5cChain = signedJWT.getHeader().getX509CertChain();
+            if (x5cChain == null || x5cChain.isEmpty()) {
+                return null;
+            }
+
+            // Parse leaf certificate (first in chain)
+            byte[] certBytes = x5cChain.get(0).decode();
+            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
+                    new ByteArrayInputStream(certBytes));
+
+            // Extract EC public key and build JWK
+            ECPublicKey ecPublicKey = (ECPublicKey) certificate.getPublicKey();
+            return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
+
+        } catch (Exception e) {
+            logger.error("Failed to extract key from x5c", e);
+            return null;
+        }
+    }
+
+    /**
+     * Compares two JWKs by their public key thumbprint.
+     */
+    private boolean keysMatch(JWK jwksKey, JWK x5cKey) {
+        try {
+            String jwksThumbprint = jwksKey.computeThumbprint().toString();
+            String x5cThumbprint = x5cKey.computeThumbprint().toString();
+            return jwksThumbprint.equals(x5cThumbprint);
+        } catch (Exception e) {
+            logger.error("Failed to compute key thumbprints", e);
+            return false;
+        }
+    }
+
+    /**
+     * Validates WSCD type from WUA against configured policy.
+     * Extracts wscd_type from eudi_wallet_info.key_storage_info.storage_certification_information.
+     *
+     * @param wuaClaims the WUA JWT claims
+     * @return true if WSCD type is allowed by policy, false otherwise
+     */
+    @SuppressWarnings("unchecked")
+    private boolean isWscdTypePolicyCompliant(JWTClaimsSet wuaClaims) {
+        Map<String, Object> eudiWalletInfo = (Map<String, Object>) wuaClaims.getClaim("eudi_wallet_info");
+        if (eudiWalletInfo == null) {
+            logger.debug("No eudi_wallet_info in WUA, skipping WSCD policy check");
+            return true;
+        }
+
+        Map<String, Object> keyStorageInfo = (Map<String, Object>) eudiWalletInfo.get("key_storage_info");
+        if (keyStorageInfo == null) {
+            logger.debug("No key_storage_info in WUA, skipping WSCD policy check");
+            return true;
+        }
+
+        Map<String, Object> storageCertInfo = (Map<String, Object>) keyStorageInfo.get("storage_certification_information");
+        if (storageCertInfo == null) {
+            logger.debug("No storage_certification_information in WUA, skipping WSCD policy check");
+            return true;
+        }
+
+        String wscdType = (String) storageCertInfo.get("wscd_type");
+        String securityLevel = (String) storageCertInfo.get("security_level");
+        logger.info("WUA WSCD type: {}, security level: {}", wscdType, securityLevel);
+
+        if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
+            logger.warn("WSCD type '{}' not allowed by policy (allowed: {})",
+                    wscdType, walletProviderConfig.getAllowedWscdTypes());
+            return false;
+        }
+
+        return true;
     }
 
     // Issuance

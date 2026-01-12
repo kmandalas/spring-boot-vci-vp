@@ -1,41 +1,27 @@
 package com.example.walletprovider.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
+import com.example.walletprovider.service.WpSigningService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/wp/.well-known")
 public class WpPublicKeyController {
 
-    @Value("classpath:/wp_key.json")
-    private Resource wpKeyResource;
+    private final WpSigningService wpSigningService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    public WpPublicKeyController(WpSigningService wpSigningService) {
+        this.wpSigningService = wpSigningService;
+    }
 
     @GetMapping(value = "/jwks.json", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> getPublicKey() throws IOException {
-        String keyJson = new String(wpKeyResource.getInputStream().readAllBytes());
-        Map<String, Object> keyMap = objectMapper.readValue(keyJson, new TypeReference<>() {});
-
-        // Remove private key component
-        keyMap.remove("d");
-
-        Map<String, Object> jwks = new LinkedHashMap<>();
-        jwks.put("keys", List.of(keyMap));
-
-        return ResponseEntity.ok(jwks);
+    public ResponseEntity<Map<String, Object>> getPublicKey() {
+        return ResponseEntity.ok(wpSigningService.getJwksResponse());
     }
 
 }

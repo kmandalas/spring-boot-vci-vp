@@ -5,6 +5,14 @@ spring:
   application:
     name: wallet-provider
 
+  ssl:
+    bundle:
+      pem:
+        wp-signing:
+          keystore:
+            certificate: classpath:wp_cert.pem
+            private-key: classpath:wp_key.pem
+
   datasource:
     url: jdbc:h2:file:./data/walletprovider;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE
     driver-class-name: org.h2.Driver
