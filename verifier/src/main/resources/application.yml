@@ -12,10 +12,15 @@ spring:
             certificate: classpath:verifier_cert.pem
             private-key: classpath:verifier_key.pem
 
+logging:
+  level:
+    com.example.verifier: DEBUG
+
 app:
   request-uri-store: http://${LOCAL_IP:localhost}:9002/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: http://${LOCAL_IP:localhost}:8080/.well-known/jwks.json
+  trusted-issuers:
+    - http://${LOCAL_IP:localhost}:8080
   response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
 
 ---
@@ -27,5 +32,6 @@ spring:
 app:
   request-uri-store: https://vp-verifier.kmandalas.com/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: https://vc-issuer.kmandalas.com/.well-known/jwks.json
+  trusted-issuers:
+    - https://vc-issuer.kmandalas.com
   response-uri: https://vp-verifier.kmandalas.com/verifier/verify-vp

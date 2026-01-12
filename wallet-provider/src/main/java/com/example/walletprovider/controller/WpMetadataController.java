@@ -7,7 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/.well-known")
@@ -48,4 +50,5 @@ public class WpMetadataController {
 
         return ResponseEntity.ok(metadata);
     }
+
 }

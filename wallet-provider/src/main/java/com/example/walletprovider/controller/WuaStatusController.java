@@ -4,7 +4,10 @@ import com.example.walletprovider.model.WalletUnitAttestation;
 import com.example.walletprovider.repository.WuaRepository;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,4 +44,5 @@ public class WuaStatusController {
 
         return ResponseEntity.ok(response);
     }
+
 }

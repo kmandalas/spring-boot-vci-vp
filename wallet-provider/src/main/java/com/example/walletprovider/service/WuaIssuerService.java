@@ -1,8 +1,8 @@
 package com.example.walletprovider.service;
 
 import com.example.walletprovider.config.WpMetadataConfig;
-import com.example.walletprovider.model.WalletUnitAttestation;
 import com.example.walletprovider.model.KeyAttestationData;
+import com.example.walletprovider.model.WalletUnitAttestation;
 import com.example.walletprovider.model.WuaCredentialRequest;
 import com.example.walletprovider.repository.WuaRepository;
 import com.nimbusds.jose.*;
@@ -59,33 +59,33 @@ public class WuaIssuerService {
     }
 
     public JWK validateCredentialRequest(WuaCredentialRequest request) {
-        if (request == null || request.getProof() == null || request.getProof().getJwt() == null) {
+        if (request == null || request.proof() == null || request.proof().jwt() == null) {
             logger.warn("Invalid request: missing proof or JWT");
             return null;
         }
 
-        if (!"jwt".equals(request.getProof().getProofType())) {
-            logger.warn("Invalid proof type: {}", request.getProof().getProofType());
+        if (!"jwt".equals(request.proof().proofType())) {
+            logger.warn("Invalid proof type: {}", request.proof().proofType());
             return null;
         }
 
-        return validateProof(request.getProof().getJwt());
+        return validateProof(request.proof().jwt());
     }
 
     public KeyAttestationData validateKeyAttestation(WuaCredentialRequest request, JWK proofJwk)
             throws CertificateException, CertPathValidatorException {
 
-        if (request.getKeyAttestation() == null) {
+        if (request.keyAttestation() == null) {
             throw new CertificateException("Key attestation is required");
         }
 
-        if (!"android_key_attestation".equals(request.getKeyAttestation().getAttestationType())) {
+        if (!"android_key_attestation".equals(request.keyAttestation().attestationType())) {
             throw new CertificateException("Unsupported attestation type: " +
-                    request.getKeyAttestation().getAttestationType());
+                    request.keyAttestation().attestationType());
         }
 
         KeyAttestationData attestationData = keyAttestationService.validateAndExtract(
-                request.getKeyAttestation().getCertificateChain());
+                request.keyAttestation().certificateChain());
 
         // Verify that the public key in the attestation matches the proof JWT's JWK
         verifyKeyMatch(proofJwk, attestationData.walletPublicKey());
@@ -309,4 +309,5 @@ public class WuaIssuerService {
     }
 
     public record WuaIssuanceResult(String wuaJwt, UUID wuaId) {}
+
 }

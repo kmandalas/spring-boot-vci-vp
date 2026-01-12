@@ -26,11 +26,15 @@ app:
     endpoints:
       issuer: http://${LOCAL_IP:localhost}:8080
       authorization: http://${LOCAL_IP:localhost}:9000
-      credential: http://${LOCAL_IP:localhost}/credential
+      credential: http://${LOCAL_IP:localhost}:8080/credential
     claims:
       audience: http://${LOCAL_IP:localhost}:8080
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: http://${LOCAL_IP:localhost}/credential
+      iss: http://${LOCAL_IP:localhost}:8080
+  wallet-provider:
+    trusted-issuers:
+      - http://${LOCAL_IP:localhost}:9001/wp
+    allowed-wscd-types: all  # Options: all, software, tee, strongbox (comma-separated)
 
 ---
 spring:
@@ -53,4 +57,8 @@ app:
     claims:
       audience: https://vc-issuer.kmandalas.com
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: https://vc-issuer.kmandalas.com/credential
+      iss: https://vc-issuer.kmandalas.com
+  wallet-provider:
+    trusted-issuers:
+      - https://wallet-provider.kmandalas.com/wp
+    allowed-wscd-types: all

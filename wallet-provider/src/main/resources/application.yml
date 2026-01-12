@@ -23,13 +23,13 @@ spring:
 wp:
   metadata:
     endpoints:
-      issuer: http://192.168.1.67:9001/wp
-      credential: http://192.168.1.67:9001/wp/wua/credential
-      jwks: http://192.168.1.67:9001/wp/jwks
-      status: http://192.168.1.67:9001/wp/wua/status
+      issuer: http://${LOCAL_IP:localhost}:9001/wp
+      credential: http://${LOCAL_IP:localhost}:9001/wp/wua/credential
+      jwks: http://${LOCAL_IP:localhost}:9001/wp/.well-known/jwks.json
+      status: http://${LOCAL_IP:localhost}:9001/wp/wua/status
     claims:
-      audience: http://192.168.1.67:9001/wp
-      iss: http://192.168.1.67:9001/wp
+      audience: http://${LOCAL_IP:localhost}:9001/wp
+      iss: http://${LOCAL_IP:localhost}:9001/wp
     provider:
       id: demo.wallet.provider
       name: Demo Wallet Provider
@@ -56,7 +56,7 @@ wp:
     endpoints:
       issuer: https://wallet-provider.onrender.com/wp
       credential: https://wallet-provider.onrender.com/wp/wua/credential
-      jwks: https://wallet-provider.onrender.com/wp/jwks
+      jwks: https://wallet-provider.onrender.com/wp/.well-known/jwks.json
       status: https://wallet-provider.onrender.com/wp/wua/status
     claims:
       audience: https://wallet-provider.onrender.com/wp

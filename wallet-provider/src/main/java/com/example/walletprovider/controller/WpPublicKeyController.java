@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/wp")
+@RequestMapping("/wp/.well-known")
 public class WpPublicKeyController {
 
     @Value("classpath:/wp_key.json")
@@ -22,7 +24,7 @@ public class WpPublicKeyController {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @GetMapping(value = "/jwks", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/jwks.json", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> getPublicKey() throws IOException {
         String keyJson = new String(wpKeyResource.getInputStream().readAllBytes());
         Map<String, Object> keyMap = objectMapper.readValue(keyJson, new TypeReference<>() {});
@@ -35,4 +37,5 @@ public class WpPublicKeyController {
 
         return ResponseEntity.ok(jwks);
     }
+
 }

@@ -1,17 +1,13 @@
 package com.example.verifier.controller;
 
-import com.authlete.sd.SDJWT;
 import com.example.verifier.config.AppConfig;
-import com.example.verifier.service.AuthleteHelper;
 import com.example.verifier.service.PresentationRequestService;
+import com.example.verifier.service.VpValidationService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.JWKSet;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -20,17 +16,19 @@ import java.util.*;
 @RequestMapping("/verifier")
 public class VerifierController {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    private final AuthleteHelper authleteHelper;
+    private final ObjectMapper objectMapper;
     private final AppConfig appConfig;
     private final PresentationRequestService presentationRequestService;
+    private final VpValidationService vpValidationService;
 
-    public VerifierController(AuthleteHelper authleteHelper, AppConfig appConfig,
-                              PresentationRequestService presentationRequestService) {
-        this.authleteHelper = authleteHelper;
+    public VerifierController(ObjectMapper objectMapper,
+                              AppConfig appConfig,
+                              PresentationRequestService presentationRequestService,
+                              VpValidationService vpValidationService) {
+        this.objectMapper = objectMapper;
         this.appConfig = appConfig;
         this.presentationRequestService = presentationRequestService;
+        this.vpValidationService = vpValidationService;
     }
 
     /**
@@ -190,139 +188,38 @@ public class VerifierController {
     public ResponseEntity<String> verifyVP(@PathVariable String requestId,
                                            @RequestParam(value = "response", required = false) String encryptedResponse) {
         try {
-            // With direct_post.jwt, the wallet sends "response" (JWE) instead of "vp_token"
-            String vpToken;
-
-            if (encryptedResponse != null && !encryptedResponse.isEmpty()) {
-                // Decrypt the JWE response
-                String decryptedPayload = presentationRequestService.decryptVpResponse(requestId, encryptedResponse);
-
-                // Parse the decrypted payload to extract vp_token
-                Map<String, Object> responsePayload = objectMapper.readValue(decryptedPayload, new TypeReference<>() {});
-                vpToken = extractVpToken(responsePayload.get("vp_token"));
-
-                if (vpToken == null) {
-                    return ResponseEntity.badRequest().body("❌ No vp_token in decrypted response.");
-                }
-
-                // State is optional - log if present but don't validate
-                Object state = responsePayload.get("state");
-                if (state != null) {
-                    System.out.println("Received state: " + state);
-                }
-            } else {
+            if (encryptedResponse == null || encryptedResponse.isEmpty()) {
                 return ResponseEntity.badRequest().body("❌ No encrypted response provided.");
             }
 
-            boolean isValid = validateVPResponse(vpToken);
-            extractDisclosedClaims(vpToken);
+            // Decrypt the JWE response
+            String decryptedPayload = presentationRequestService.decryptVpResponse(requestId, encryptedResponse);
+
+            // Parse the decrypted payload to extract vp_token
+            Map<String, Object> responsePayload = objectMapper.readValue(decryptedPayload, new TypeReference<>() {});
+            String vpToken = vpValidationService.extractVpToken(responsePayload.get("vp_token"));
+
+            if (vpToken == null) {
+                return ResponseEntity.badRequest().body("❌ No vp_token in decrypted response.");
+            }
+
+            // Validate VP and extract claims
+            VpValidationService.ValidationResult result = vpValidationService.validateAndExtract(vpToken);
 
             // Cleanup the request after processing
             presentationRequestService.removeRequest(requestId);
 
-            return isValid ? ResponseEntity.ok("✅ VP Token is valid!") : ResponseEntity.badRequest().body("❌ VP Token validation failed!");
+            if (result.valid()) {
+                // Log disclosed claims
+                System.out.println("Disclosed claims from issuer '" + result.issuer() + "':");
+                result.disclosedClaims().forEach((k, v) -> System.out.println(" - " + k + ": " + v));
+                return ResponseEntity.ok("✅ VP Token is valid!");
+            } else {
+                return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
+            }
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("❌ Error during VP verification: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Extracts the VP token from various formats:
-     * - String: plain vp_token (backward compatibility)
-     * - Map: DCQL format {"credentialId": ["vpToken1", ...]}
-     */
-    @SuppressWarnings("unchecked")
-    private String extractVpToken(Object vpTokenObj) {
-        if (vpTokenObj == null) {
-            return null;
-        }
-
-        // String format (backward compatibility)
-        if (vpTokenObj instanceof String) {
-            return (String) vpTokenObj;
-        }
-
-        // DCQL format: Map<QueryId, List<VP>>
-        if (vpTokenObj instanceof Map) {
-            Map<String, Object> vpTokenMap = (Map<String, Object>) vpTokenObj;
-            // Get the first credential's first VP token...
-            for (Object value : vpTokenMap.values()) {
-                if (value instanceof List<?> vpList) {
-                    if (!vpList.isEmpty() && vpList.get(0) instanceof String) {
-                        return (String) vpList.get(0);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Validates the VP Token by verifying both the SD-JWT Credential and the Key Binding JWT
-     */
-    private boolean validateVPResponse(String vpToken) {
-        try {
-            // Step 1: Parse the VP Token
-            SDJWT vp = SDJWT.parse(vpToken);
-
-            // Step 2: Fetch Issuer’s Public Key (for SD-JWT validation)
-            // Could be also retrieved from "iss" claim of the payload
-            JWKSet issuerJwkSet = JWKSet.load(new URL(appConfig.getIssuerJwksUrl()));
-            JWK issuerPublicKey = issuerJwkSet.getKeys().get(0);
-
-            // Step 3: do verify
-            authleteHelper.verifyVP(vp, issuerPublicKey);
-            return true; // Both signatures are valid
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private void extractDisclosedClaims(String sdJwt) throws Exception {
-        System.out.println("\nDecoding and verifying SD-JWT...");
-
-        // Step 1: Split into JWT and disclosures
-        String[] parts = sdJwt.split("~", -1);
-        if (parts.length < 1) {
-            throw new IllegalArgumentException("Invalid SD-JWT format");
-        }
-
-        String jwtPart = parts[0];
-        List<String> disclosures = Arrays.stream(parts)
-                .skip(1)
-                .filter(d -> !d.isEmpty())
-                .toList();
-
-        System.out.println("Parsed JWT Part: " + jwtPart);
-        System.out.println("Disclosures Count: " + disclosures.size());
-
-        // Step 2: Decode Disclosures Safely
-        System.out.println("Disclosed Claims:");
-        for (String disclosure : disclosures) {
-            if (disclosure.contains(".")) {
-                System.out.println("Skipping JWT-style disclosure: " + disclosure);
-                continue; // Ignore JWS-style disclosures
-            }
-
-            try {
-                byte[] decodedBytes = Base64.getUrlDecoder().decode(disclosure);
-                String decodedJson = new String(decodedBytes);
-                List<String> claimData = objectMapper.readValue(decodedJson, new TypeReference<>() {});
-
-                if (claimData.size() >= 3) {
-                    String claimName = claimData.get(1);
-                    String claimValue = claimData.get(2);
-                    System.out.println(" - " + claimName + ": " + claimValue);
-                } else {
-                    System.out.println(" - Malformed disclosure: " + decodedJson);
-                }
-            } catch (IllegalArgumentException e) {
-                System.out.println("❌ Error decoding disclosure: " + disclosure);
-                e.printStackTrace();
-            }
         }
     }
 
