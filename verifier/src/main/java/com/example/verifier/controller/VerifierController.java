@@ -197,6 +197,13 @@ public class VerifierController {
 
             // Parse the decrypted payload to extract vp_token
             Map<String, Object> responsePayload = objectMapper.readValue(decryptedPayload, new TypeReference<>() {});
+
+            // State is optional - log if present but don't validate
+            Object state = responsePayload.get("state");
+            if (state != null) {
+                System.out.println("Received state: " + state);
+            }
+
             String vpToken = vpValidationService.extractVpToken(responsePayload.get("vp_token"));
 
             if (vpToken == null) {
