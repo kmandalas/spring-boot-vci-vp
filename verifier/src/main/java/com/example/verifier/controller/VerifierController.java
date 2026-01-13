@@ -159,7 +159,12 @@ public class VerifierController {
                     <a href="%s" class="wallet-link">OpenID4VP WALLET</a>
                     <script>
                         const deepLink = "%s";
-                        new QRCode(document.getElementById("qrcode"), deepLink);
+                        new QRCode(document.getElementById("qrcode"), {
+                            text: deepLink,
+                            width: 256,
+                            height: 256,
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
                     </script>
                 </body>
                 </html>
