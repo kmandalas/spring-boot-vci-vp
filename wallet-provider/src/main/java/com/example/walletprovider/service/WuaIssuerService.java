@@ -135,6 +135,7 @@ public class WuaIssuerService {
             attestedKey.put("crv", ecKey.getCurve().getName());
             attestedKey.put("x", ecKey.getX().toString());
             attestedKey.put("y", ecKey.getY().toString());
+            attestedKey.put("alg", "ES256");
         }
 
         Map<String, Object> generalInfo = new LinkedHashMap<>();
