@@ -136,6 +136,10 @@ public class WuaIssuerService {
             attestedKey.put("x", ecKey.getX().toString());
             attestedKey.put("y", ecKey.getY().toString());
             attestedKey.put("alg", "ES256");
+            // Include kid if present (needed for KB-JWT verification)
+            if (walletKey.getKeyID() != null) {
+                attestedKey.put("kid", walletKey.getKeyID());
+            }
         }
 
         Map<String, Object> generalInfo = new LinkedHashMap<>();
