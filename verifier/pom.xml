@@ -42,8 +42,24 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>0.10.6</version>
+                <configuration>
+                    <buildArgs>
+                        <buildArg>-H:IncludeResources=.*\.json$</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.pem$</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.yml$</buildArg>
+                    </buildArgs>
+                </configuration>
             </plugin>
         </plugins>
     </build>
