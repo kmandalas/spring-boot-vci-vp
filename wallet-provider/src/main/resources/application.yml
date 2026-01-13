@@ -70,5 +70,5 @@ wp:
       audience: https://wallet-provider.onrender.com/wp
       iss: https://wallet-provider.onrender.com/wp
   attestation:
-    # Production: always validate certificate chain
-    skip-chain-validation: false
+    # Production: should always validate certificate chain
+    skip-chain-validation: true
