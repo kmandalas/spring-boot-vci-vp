@@ -65,7 +65,7 @@ public class VpValidationService {
             // Step 3: Validate issuer against local "trusted list"
             String issuer = credentialJwt.getJWTClaimsSet().getIssuer();
             if (!appConfig.isTrustedIssuer(issuer)) {
-                logger.warn("Untrusted credential issuer: {}", issuer);
+                logger.warn("⚠️Untrusted credential issuer: {}", issuer);
                 return ValidationResult.failure("Untrusted credential issuer: " + issuer);
             }
             logger.info("Credential issuer '{}' is trusted", issuer);
@@ -83,7 +83,7 @@ public class VpValidationService {
                 return ValidationResult.failure("Failed to extract key from x5c header");
             }
             if (!keysMatch(jwksKey, x5cKey)) {
-                logger.warn("x5c key does not match JWKS key - possible tampering");
+                logger.warn("⚠️x5c key does not match JWKS key - possible tampering");
                 return ValidationResult.failure("x5c key does not match issuer JWKS");
             }
             logger.info("x5c key matches JWKS key - cross-check passed");
@@ -98,7 +98,7 @@ public class VpValidationService {
             return ValidationResult.success(issuer, claims);
 
         } catch (Exception e) {
-            logger.error("VP validation failed", e);
+            logger.error("❌VP validation failed", e);
             return ValidationResult.failure(e.getMessage());
         }
     }
@@ -110,7 +110,7 @@ public class VpValidationService {
         try {
             List<com.nimbusds.jose.util.Base64> x5cChain = credentialJwt.getHeader().getX509CertChain();
             if (x5cChain == null || x5cChain.isEmpty()) {
-                logger.error("No x5c certificate chain in credential JWT header");
+                logger.error("❌No x5c certificate chain in credential JWT header");
                 return null;
             }
 
@@ -127,7 +127,7 @@ public class VpValidationService {
             return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
 
         } catch (Exception e) {
-            logger.error("Failed to extract key from x5c", e);
+            logger.error("❌Failed to extract key from x5c", e);
             return null;
         }
     }
@@ -141,7 +141,7 @@ public class VpValidationService {
             String x5cThumbprint = x5cKey.computeThumbprint().toString();
             return jwksThumbprint.equals(x5cThumbprint);
         } catch (Exception e) {
-            logger.error("Failed to compute key thumbprints", e);
+            logger.error("❌Failed to compute key thumbprints", e);
             return false;
         }
     }
@@ -168,7 +168,7 @@ public class VpValidationService {
                     claims.put(claimData.get(1), claimData.get(2));
                 }
             } catch (Exception e) {
-                logger.warn("Error decoding disclosure: {}", disclosure);
+                logger.warn("⚠️Error decoding disclosure: {}", disclosure);
             }
         }
 

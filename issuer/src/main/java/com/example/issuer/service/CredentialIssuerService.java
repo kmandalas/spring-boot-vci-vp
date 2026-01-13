@@ -109,13 +109,13 @@ public class CredentialIssuerService {
             // Ensure algorithm is not 'none' and not a symmetric algorithm
             JWSAlgorithm algorithm = header.getAlgorithm();
             if (algorithm == JWSAlgorithm.NONE || algorithm.getName().startsWith("HS")) {
-                logger.warn("Rejected algorithm: {}", algorithm);
+                logger.warn("⚠️Rejected algorithm: {}", algorithm);
                 return null;
             }
 
             // Verify that the type is "openid4vci-proof+jwt"
             if (!"openid4vci-proof+jwt".equals(header.getType().toString())) {
-                logger.warn("Invalid proof type: {}", header.getType());
+                logger.warn("⚠️Invalid proof type: {}", header.getType());
                 return null;
             }
 
@@ -124,7 +124,7 @@ public class CredentialIssuerService {
 
             // Validate audience (must be the Credential Issuer Identifier)
             if (!claims.getAudience().contains(appMetadataConfig.getClaims().getAudience())) {
-                logger.warn("Invalid audience: {}", claims.getAudience());
+                logger.warn("⚠️Invalid audience: {}", claims.getAudience());
                 return null;
             }
 
@@ -132,14 +132,14 @@ public class CredentialIssuerService {
             Date issuedAt = claims.getIssueTime();
             if (issuedAt == null || issuedAt.toInstant().isBefore(
                     Instant.now().minus(MAX_PROOF_AGE_SECONDS, ChronoUnit.SECONDS))) {
-                logger.warn("Proof JWT too old or missing iat");
+                logger.warn("⚠️Proof JWT too old or missing iat");
                 return null;
             }
 
             // Validate nonce to prevent replay attacks
             String nonce = claims.getStringClaim("nonce");
             if (nonce != null && !isValidNonce(nonce)) {
-                logger.warn("Invalid or reused nonce");
+                logger.warn("⚠️Invalid or reused nonce");
                 return null;
             }
 
@@ -158,7 +158,7 @@ public class CredentialIssuerService {
                 // Fallback to jwk header (backward compatibility)
                 walletJwk = header.getJWK();
                 if (walletJwk == null) {
-                    logger.warn("Missing both key_attestation and jwk in proof header");
+                    logger.warn("⚠️Missing both key_attestation and jwk in proof header");
                     return null;
                 }
                 logger.info("Processing credential request with inline JWK (no WUA)");
@@ -167,12 +167,12 @@ public class CredentialIssuerService {
             // 4. Verify Signature using the extracted wallet key
             boolean isValid = verifySignatureWithProvidedJwk(signedJWT, walletJwk);
             if (!isValid) {
-                logger.warn("Proof signature verification failed");
+                logger.warn("⚠️Proof signature verification failed");
             }
             return isValid ? walletJwk : null;
 
         } catch (Exception e) {
-            logger.error("Error validating proof JWT", e);
+            logger.error("❌Error validating proof JWT", e);
             return null;
         }
     }
@@ -192,7 +192,7 @@ public class CredentialIssuerService {
             // 2. Extract and validate WUA issuer
             String wuaIssuer = wuaClaims.getIssuer();
             if (!walletProviderConfig.isTrustedIssuer(wuaIssuer)) {
-                logger.warn("Untrusted WUA issuer: {}", wuaIssuer);
+                logger.warn("⚠️Untrusted WUA issuer: {}", wuaIssuer);
                 return null;
             }
             logger.debug("WUA issuer '{}' is trusted", wuaIssuer);
@@ -206,7 +206,7 @@ public class CredentialIssuerService {
             JWK x5cKey = extractKeyFromX5c(wuaJwt);
             if (x5cKey != null) {
                 if (!keysMatch(wpJwksKey, x5cKey)) {
-                    logger.warn("WUA x5c key does not match Wallet Provider JWKS - possible tampering");
+                    logger.warn("⚠️WUA x5c key does not match Wallet Provider JWKS - possible tampering");
                     return null;
                 }
                 logger.debug("WUA x5c key matches JWKS key - cross-check passed");
@@ -216,7 +216,7 @@ public class CredentialIssuerService {
 
             // 5. Verify WUA signature
             if (!verifySignatureWithProvidedJwk(wuaJwt, wpJwksKey)) {
-                logger.warn("WUA signature verification failed");
+                logger.warn("⚠️WUA signature verification failed");
                 return null;
             }
             logger.debug("WUA signature verified successfully");
@@ -229,7 +229,7 @@ public class CredentialIssuerService {
             // 7. Extract attested_keys array from WUA
             List<Map<String, Object>> attestedKeys = (List<Map<String, Object>>) wuaClaims.getClaim("attested_keys");
             if (attestedKeys == null || attestedKeys.isEmpty()) {
-                logger.warn("No attested_keys in WUA");
+                logger.warn("⚠️No attested_keys in WUA");
                 return null;
             }
 
@@ -240,12 +240,12 @@ public class CredentialIssuerService {
                 try {
                     keyIndex = Integer.parseInt(kid);
                 } catch (NumberFormatException e) {
-                    logger.warn("Invalid kid format '{}', using index 0", kid);
+                    logger.warn("⚠️Invalid kid format '{}', using index 0", kid);
                 }
             }
 
             if (keyIndex >= attestedKeys.size()) {
-                logger.warn("Key index {} out of bounds (attested_keys size: {})", keyIndex, attestedKeys.size());
+                logger.warn("⚠️Key index {} out of bounds (attested_keys size: {})", keyIndex, attestedKeys.size());
                 return null;
             }
 
@@ -257,7 +257,7 @@ public class CredentialIssuerService {
             return walletJwk;
 
         } catch (Exception e) {
-            logger.error("Error extracting key from WUA", e);
+            logger.error("❌Error extracting key from WUA", e);
             return null;
         }
     }
@@ -279,7 +279,7 @@ public class CredentialIssuerService {
 
             return false;
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("❌ Signature verification failed", e);
             return false;
         }
     }
@@ -306,7 +306,7 @@ public class CredentialIssuerService {
             return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
 
         } catch (Exception e) {
-            logger.error("Failed to extract key from x5c", e);
+            logger.error("❌Failed to extract key from x5c", e);
             return null;
         }
     }
@@ -320,7 +320,7 @@ public class CredentialIssuerService {
             String x5cThumbprint = x5cKey.computeThumbprint().toString();
             return jwksThumbprint.equals(x5cThumbprint);
         } catch (Exception e) {
-            logger.error("Failed to compute key thumbprints", e);
+            logger.error("❌Failed to compute key thumbprints", e);
             return false;
         }
     }
@@ -357,7 +357,7 @@ public class CredentialIssuerService {
         logger.info("WUA WSCD type: {}, security level: {}", wscdType, securityLevel);
 
         if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
-            logger.warn("WSCD type '{}' not allowed by policy (allowed: {})",
+            logger.warn("⚠️WSCD type '{}' not allowed by policy (allowed: {})",
                     wscdType, walletProviderConfig.getAllowedWscdTypes());
             return false;
         }

@@ -49,7 +49,7 @@ public class WuaCredentialController {
             // 1. Validate proof JWT
             JWK walletKey = wuaIssuerService.validateCredentialRequest(request);
             if (walletKey == null) {
-                logger.warn("Proof validation failed");
+                logger.warn("⚠️Proof validation failed");
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "invalid_proof",
                         "error_description", "The provided proof JWT is invalid"
@@ -61,7 +61,7 @@ public class WuaCredentialController {
             try {
                 attestationData = wuaIssuerService.validateKeyAttestation(request, walletKey);
             } catch (CertificateException | CertPathValidatorException e) {
-                logger.warn("Key attestation validation failed: {}", e.getMessage());
+                logger.warn("⚠️Key attestation validation failed: {}", e.getMessage());
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "invalid_key_attestation",
                         "error_description", e.getMessage()
@@ -80,7 +80,7 @@ public class WuaCredentialController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            logger.error("Error issuing WUA", e);
+            logger.error("❌Error issuing WUA", e);
             return ResponseEntity.internalServerError().body(Map.of(
                     "error", "server_error",
                     "error_description", "An error occurred while issuing the WUA"

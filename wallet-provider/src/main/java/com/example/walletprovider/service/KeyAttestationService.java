@@ -61,7 +61,7 @@ public class KeyAttestationService {
         logger.debug("Parsed {} certificates from chain", certChain.size());
 
         if (skipChainValidation) {
-            logger.warn("Skipping certificate chain validation (development mode)");
+            logger.warn("⚠️Skipping certificate chain validation (development mode)");
         } else {
             validateChainToGoogleRoot(certChain);
             logger.debug("Certificate chain validated successfully");

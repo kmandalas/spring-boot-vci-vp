@@ -54,12 +54,12 @@ public class WuaIssuerService {
 
     public JWK validateCredentialRequest(WuaCredentialRequest request) {
         if (request == null || request.proof() == null || request.proof().jwt() == null) {
-            logger.warn("Invalid request: missing proof or JWT");
+            logger.warn("⚠️Invalid request: missing proof or JWT");
             return null;
         }
 
         if (!"jwt".equals(request.proof().proofType())) {
-            logger.warn("Invalid proof type: {}", request.proof().proofType());
+            logger.warn("⚠️Invalid proof type: {}", request.proof().proofType());
             return null;
         }
 
@@ -188,19 +188,19 @@ public class WuaIssuerService {
             // Reject 'none' and symmetric algorithms
             JWSAlgorithm algorithm = header.getAlgorithm();
             if (algorithm == JWSAlgorithm.NONE || algorithm.getName().startsWith("HS")) {
-                logger.warn("Rejected algorithm: {}", algorithm);
+                logger.warn("⚠️Rejected algorithm: {}", algorithm);
                 return null;
             }
 
             // Verify type
             if (header.getType() == null || !"openid4vci-proof+jwt".equals(header.getType().toString())) {
-                logger.warn("Invalid proof type header: {}", header.getType());
+                logger.warn("⚠️Invalid proof type header: {}", header.getType());
                 return null;
             }
 
             // Either kid or jwk, not both
             if (header.getKeyID() != null && header.getJWK() != null) {
-                logger.warn("Both kid and jwk present in header");
+                logger.warn("⚠️Both kid and jwk present in header");
                 return null;
             }
 
@@ -208,7 +208,7 @@ public class WuaIssuerService {
 
             // Validate audience
             if (!claims.getAudience().contains(wpMetadataConfig.getClaims().getAudience())) {
-                logger.warn("Invalid audience: {}", claims.getAudience());
+                logger.warn("⚠️Invalid audience: {}", claims.getAudience());
                 return null;
             }
 
@@ -217,34 +217,34 @@ public class WuaIssuerService {
             long maxProofAge = wpMetadataConfig.getTime().getMaxProofAgeSeconds();
             if (issuedAt == null || issuedAt.toInstant().isBefore(
                     Instant.now().minus(maxProofAge, ChronoUnit.SECONDS))) {
-                logger.warn("Proof JWT too old or missing iat");
+                logger.warn("⚠️Proof JWT too old or missing iat");
                 return null;
             }
 
             // Validate nonce
             String nonce = claims.getStringClaim("nonce");
             if (nonce != null && !isValidNonce(nonce)) {
-                logger.warn("Invalid or reused nonce");
+                logger.warn("⚠️Invalid or reused nonce");
                 return null;
             }
 
             // Extract wallet public key
             JWK walletJwk = header.getJWK();
             if (walletJwk == null) {
-                logger.warn("Missing JWK in proof header");
+                logger.warn("⚠️Missing JWK in proof header");
                 return null;
             }
 
             // Verify signature
             if (!verifySignatureWithProvidedJwk(signedJWT, walletJwk)) {
-                logger.warn("Proof signature verification failed");
+                logger.warn("⚠️Proof signature verification failed");
                 return null;
             }
 
             return walletJwk;
 
         } catch (Exception e) {
-            logger.error("Error validating proof JWT", e);
+            logger.error("❌Error validating proof JWT", e);
             return null;
         }
     }
@@ -273,7 +273,7 @@ public class WuaIssuerService {
             }
             return false;
         } catch (Exception e) {
-            logger.error("Error verifying signature", e);
+            logger.error("❌Error verifying signature", e);
             return false;
         }
     }

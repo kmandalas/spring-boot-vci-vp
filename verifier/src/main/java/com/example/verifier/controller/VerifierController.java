@@ -5,6 +5,8 @@ import com.example.verifier.service.PresentationRequestService;
 import com.example.verifier.service.VpValidationService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,8 @@ import java.util.*;
 @RestController
 @RequestMapping("/verifier")
 public class VerifierController {
+
+    private static final Logger logger = LoggerFactory.getLogger(VerifierController.class);
 
     private final ObjectMapper objectMapper;
     private final AppConfig appConfig;
@@ -201,7 +205,7 @@ public class VerifierController {
             // State is optional - log if present but don't validate
             Object state = responsePayload.get("state");
             if (state != null) {
-                System.out.println("Received state: " + state);
+                logger.debug("Received state: {}", state);
             }
 
             String vpToken = vpValidationService.extractVpToken(responsePayload.get("vp_token"));
@@ -218,8 +222,8 @@ public class VerifierController {
 
             if (result.valid()) {
                 // Log disclosed claims
-                System.out.println("Disclosed claims from issuer '" + result.issuer() + "':");
-                result.disclosedClaims().forEach((k, v) -> System.out.println(" - " + k + ": " + v));
+                logger.info("✅ Disclosed claims from issuer '{}':", result.issuer());
+                result.disclosedClaims().forEach((k, v) -> logger.info("   - {}: {}", k, v));
                 return ResponseEntity.ok("✅ VP Token is valid!");
             } else {
                 return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
