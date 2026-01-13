@@ -30,8 +30,8 @@ spring:
       on-profile: cloud
 
 app:
-  request-uri-store: https://vp-verifier.kmandalas.com/verifier/request-object/
+  request-uri-store: https://vp-verifier.onrender.com/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
   trusted-issuers:
-    - https://vc-issuer.kmandalas.com
-  response-uri: https://vp-verifier.kmandalas.com/verifier/verify-vp
+    - https://vc-issuer.onrender.com
+  response-uri: https://vp-verifier.onrender.com/verifier/verify-vp
