@@ -1,10 +1,6 @@
 package com.example.issuer.service;
 
-import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.util.Base64;
+import com.example.issuer.util.JwtSignatureUtils;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.slf4j.Logger;
@@ -13,12 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.ECPublicKey;
-import java.util.List;
 import java.util.Map;
 import java.util.zip.Inflater;
 
@@ -55,7 +46,7 @@ public class StatusListValidationService {
 
             // 2. Parse and verify JWT signature (using x5c from header)
             SignedJWT signedJWT = SignedJWT.parse(statusListJwt);
-            if (!verifyStatusListSignature(signedJWT)) {
+            if (!JwtSignatureUtils.verifySignatureWithX5c(signedJWT)) {
                 logger.warn("⚠️Status list signature verification failed");
                 return true; // Fail-safe: treat as revoked if can't verify
             }
@@ -103,36 +94,6 @@ public class StatusListValidationService {
         } catch (Exception e) {
             logger.error("❌Failed to fetch status list from {}", statusListUri, e);
             return null;
-        }
-    }
-
-    /**
-     * Verify the status list JWT signature using x5c certificate chain.
-     */
-    private boolean verifyStatusListSignature(SignedJWT signedJWT) {
-        try {
-            List<Base64> x5cChain = signedJWT.getHeader().getX509CertChain();
-            if (x5cChain == null || x5cChain.isEmpty()) {
-                logger.warn("⚠️No x5c certificate chain in status list token");
-                return false;
-            }
-
-            // Parse leaf certificate (first in chain)
-            byte[] certBytes = x5cChain.get(0).decode();
-            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-            X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
-                    new ByteArrayInputStream(certBytes));
-
-            // Extract EC public key and verify
-            ECPublicKey ecPublicKey = (ECPublicKey) certificate.getPublicKey();
-            ECKey ecKey = new ECKey.Builder(Curve.P_256, ecPublicKey).build();
-            JWSVerifier verifier = new ECDSAVerifier(ecKey);
-
-            return signedJWT.verify(verifier);
-
-        } catch (Exception e) {
-            logger.error("❌Error verifying status list signature", e);
-            return false;
         }
     }
 

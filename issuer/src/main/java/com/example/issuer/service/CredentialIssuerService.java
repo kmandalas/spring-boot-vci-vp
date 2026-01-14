@@ -2,33 +2,21 @@ package com.example.issuer.service;
 
 import com.authlete.sd.SDJWT;
 import com.example.issuer.config.AppMetadataConfig;
+import com.example.issuer.config.WalletProviderConfig;
 import com.example.issuer.model.CredentialRequest;
+import com.example.issuer.util.JwtSignatureUtils;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
-import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.KeyType;
-import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.util.Base64;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.example.issuer.config.WalletProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.net.URL;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPublicKey;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -62,7 +50,9 @@ public class CredentialIssuerService {
         this.statusListValidationService = statusListValidationService;
     }
 
-    // Nonce
+    /**
+     * Generates a random nonce for credential request replay protection.
+     */
     public String generateCredentialNonce() {
         // Generate a random nonce
         String nonce = java.util.UUID.randomUUID().toString();
@@ -71,6 +61,9 @@ public class CredentialIssuerService {
         return nonce;
     }
 
+    /**
+     * Validates nonce hasn't been used before (replay attack prevention).
+     */
     private boolean isValidNonce(String nonce) {
         if (nonce == null) {
             return false;
@@ -86,7 +79,12 @@ public class CredentialIssuerService {
         return true;
     }
 
-    // Validation
+    /**
+     * Validates credential request and extracts wallet public key from JWT proof.
+     *
+     * @param request the credential request containing proof JWT
+     * @return wallet's public JWK if valid, null otherwise
+     */
     public JWK validateCredentialRequest(CredentialRequest request) {
         if (request == null || request.proof() == null || request.proof().jwt() == null) {
             return null;
@@ -101,6 +99,10 @@ public class CredentialIssuerService {
         return validateProof(proofJwt);
     } // todo - check also format, credentialConfigurationId?
 
+    /**
+     * Validates JWT proof: algorithm, type, audience, freshness, nonce, and signature.
+     * Supports both inline JWK and WUA-based key attestation.
+     */
     private JWK validateProof(String proofJwt) {
         try {
             // Parse the JWT
@@ -168,7 +170,7 @@ public class CredentialIssuerService {
             }
 
             // 4. Verify Signature using the extracted wallet key
-            boolean isValid = verifySignatureWithProvidedJwk(signedJWT, walletJwk);
+            boolean isValid = JwtSignatureUtils.verifySignature(signedJWT, walletJwk);
             if (!isValid) {
                 logger.warn("⚠️Proof signature verification failed");
             }
@@ -206,7 +208,7 @@ public class CredentialIssuerService {
             JWK wpJwksKey = wpJwkSet.getKeys().get(0);
 
             // 4. Extract x5c from WUA header and cross-check with JWKS (if present)
-            JWK x5cKey = extractKeyFromX5c(wuaJwt);
+            JWK x5cKey = JwtSignatureUtils.extractKeyFromX5c(wuaJwt);
             if (x5cKey != null) {
                 if (!keysMatch(wpJwksKey, x5cKey)) {
                     logger.warn("⚠️WUA x5c key does not match Wallet Provider JWKS - possible tampering");
@@ -218,7 +220,7 @@ public class CredentialIssuerService {
             }
 
             // 5. Verify WUA signature
-            if (!verifySignatureWithProvidedJwk(wuaJwt, wpJwksKey)) {
+            if (!JwtSignatureUtils.verifySignature(wuaJwt, wpJwksKey)) {
                 logger.warn("⚠️WUA signature verification failed");
                 return null;
             }
@@ -266,55 +268,6 @@ public class CredentialIssuerService {
 
         } catch (Exception e) {
             logger.error("❌Error extracting key from WUA", e);
-            return null;
-        }
-    }
-
-    private boolean verifySignatureWithProvidedJwk(SignedJWT signedJWT, JWK jwk) {
-        try {
-            // Handle different key types
-            if (jwk.getKeyType() == KeyType.RSA) {
-                RSAPublicKey publicKey = ((RSAKey)jwk).toRSAPublicKey();
-                JWSVerifier verifier = new RSASSAVerifier(publicKey);
-                return signedJWT.verify(verifier);
-            }
-            else if (jwk.getKeyType() == KeyType.EC) {
-                ECPublicKey publicKey = ((ECKey)jwk).toECPublicKey();
-                JWSVerifier verifier = new ECDSAVerifier(publicKey);
-                return signedJWT.verify(verifier);
-            }
-            // Add other key types as needed (EdDSA, etc.)
-
-            return false;
-        } catch (Exception e) {
-            logger.error("❌ Signature verification failed", e);
-            return false;
-        }
-    }
-
-    /**
-     * Extracts the public key from the x5c certificate chain in the JWT header.
-     * Returns null if no x5c is present.
-     */
-    private JWK extractKeyFromX5c(SignedJWT signedJWT) {
-        try {
-            List<Base64> x5cChain = signedJWT.getHeader().getX509CertChain();
-            if (x5cChain == null || x5cChain.isEmpty()) {
-                return null;
-            }
-
-            // Parse leaf certificate (first in chain)
-            byte[] certBytes = x5cChain.get(0).decode();
-            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-            X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
-                    new ByteArrayInputStream(certBytes));
-
-            // Extract EC public key and build JWK
-            ECPublicKey ecPublicKey = (ECPublicKey) certificate.getPublicKey();
-            return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
-
-        } catch (Exception e) {
-            logger.error("❌Failed to extract key from x5c", e);
             return null;
         }
     }
@@ -413,7 +366,13 @@ public class CredentialIssuerService {
         return false;
     }
 
-    // Issuance
+    /**
+     * Generates an SD-JWT Verifiable Credential bound to the wallet's public key.
+     *
+     * @param walletKey the wallet's public key for key binding
+     * @param userIdentifier the authenticated user's identifier
+     * @return serialized SD-JWT credential
+     */
     public String generateSdJwt(JWK walletKey, String userIdentifier) throws JOSEException, ParseException {
         // Step 1: Ensure wallet key is provided
         if (walletKey == null) {
