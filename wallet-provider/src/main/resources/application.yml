@@ -34,7 +34,7 @@ wp:
       issuer: http://${LOCAL_IP:localhost}:9001/wp
       credential: http://${LOCAL_IP:localhost}:9001/wp/wua/credential
       jwks: http://${LOCAL_IP:localhost}:9001/wp/.well-known/jwks.json
-      status: http://${LOCAL_IP:localhost}:9001/wp/wua/status
+      status-list: http://${LOCAL_IP:localhost}:9001/wp/.well-known/status-list
     claims:
       audience: http://${LOCAL_IP:localhost}:9001/wp
       iss: http://${LOCAL_IP:localhost}:9001/wp
@@ -65,7 +65,7 @@ wp:
       issuer: https://wallet-provider.onrender.com/wp
       credential: https://wallet-provider.onrender.com/wp/wua/credential
       jwks: https://wallet-provider.onrender.com/wp/.well-known/jwks.json
-      status: https://wallet-provider.onrender.com/wp/wua/status
+      status-list: https://wallet-provider.onrender.com/wp/.well-known/status-list
     claims:
       audience: https://wallet-provider.onrender.com/wp
       iss: https://wallet-provider.onrender.com/wp

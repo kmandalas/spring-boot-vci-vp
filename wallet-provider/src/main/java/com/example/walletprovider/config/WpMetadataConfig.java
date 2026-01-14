@@ -16,7 +16,7 @@ public class WpMetadataConfig {
         private String issuer;
         private String credential;
         private String jwks;
-        private String status;
+        private String statusList;
 
         public String getIssuer() {
             return issuer;
@@ -42,12 +42,12 @@ public class WpMetadataConfig {
             this.jwks = jwks;
         }
 
-        public String getStatus() {
-            return status;
+        public String getStatusList() {
+            return statusList;
         }
 
-        public void setStatus(String status) {
-            this.status = status;
+        public void setStatusList(String statusList) {
+            this.statusList = statusList;
         }
     }
 

@@ -39,13 +39,16 @@ public class WuaIssuerService {
     private final WuaRepository wuaRepository;
     private final KeyAttestationService keyAttestationService;
     private final WpSigningService wpSigningService;
+    private final StatusListIndexService statusListIndexService;
 
     public WuaIssuerService(WpMetadataConfig wpMetadataConfig, WuaRepository wuaRepository,
-                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService) {
+                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService,
+                           StatusListIndexService statusListIndexService) {
         this.wpMetadataConfig = wpMetadataConfig;
         this.wuaRepository = wuaRepository;
         this.keyAttestationService = keyAttestationService;
         this.wpSigningService = wpSigningService;
+        this.statusListIndexService = statusListIndexService;
     }
 
     public String generateNonce() {
@@ -94,10 +97,15 @@ public class WuaIssuerService {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(wpMetadataConfig.getTime().getWuaTtlSeconds(), ChronoUnit.SECONDS);
 
-        // Generate WUA JWT
-        String wuaJwt = generateWuaJwt(wuaId, walletKey, attestationData, issuedAt, expiresAt);
+        // Allocate status list index (per IETF Token Status List spec)
+        var statusList = statusListIndexService.getOrCreateActiveList();
+        int statusListIdx = statusListIndexService.allocateIndex(statusList.id());
 
-        // Persist WUA record
+        // Generate WUA JWT with status list reference
+        String wuaJwt = generateWuaJwt(wuaId, walletKey, attestationData, issuedAt, expiresAt,
+                statusList.id(), statusListIdx);
+
+        // Persist WUA record with status list fields
         String thumbprint = walletKey.computeThumbprint().toString();
         WalletUnitAttestation wua = new WalletUnitAttestation(
                 wuaId,
@@ -105,18 +113,21 @@ public class WuaIssuerService {
                 attestationData.wscdType(),
                 attestationData.wscdSecurityLevel(),
                 issuedAt,
-                expiresAt
+                expiresAt,
+                statusList.id(),
+                statusListIdx
         );
         wuaRepository.save(wua);
 
-        logger.info("Issued WUA: id={}, wscdType={}, expires={}",
-                wuaId, attestationData.wscdType(), expiresAt);
+        logger.info("Issued WUA: id={}, wscdType={}, statusListIdx={}, expires={}",
+                wuaId, attestationData.wscdType(), statusListIdx, expiresAt);
 
         return new WuaIssuanceResult(wuaJwt, wuaId);
     }
 
     private String generateWuaJwt(UUID wuaId, JWK walletKey, KeyAttestationData attestationData,
-                                   Instant issuedAt, Instant expiresAt)
+                                   Instant issuedAt, Instant expiresAt,
+                                   String statusListId, int statusListIdx)
             throws JOSEException {
 
         ECKey wpKey = wpSigningService.getSigningKey();
@@ -160,11 +171,13 @@ public class WuaIssuerService {
         eudiWalletInfo.put("general_info", generalInfo);
         eudiWalletInfo.put("key_storage_info", keyStorageInfo);
 
-        Map<String, Object> statusList = new LinkedHashMap<>();
-        statusList.put("uri", wpMetadataConfig.getEndpoints().getStatus() + "/" + wuaId);
+        // Token Status List reference per IETF draft-ietf-oauth-status-list
+        Map<String, Object> statusListClaim = new LinkedHashMap<>();
+        statusListClaim.put("idx", statusListIdx);
+        statusListClaim.put("uri", wpMetadataConfig.getEndpoints().getStatusList() + "/" + statusListId);
 
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("status_list", statusList);
+        status.put("status_list", statusListClaim);
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(wpMetadataConfig.getClaims().getIss())

@@ -51,12 +51,15 @@ public class CredentialIssuerService {
     private final AuthleteHelper authleteHelper;
     private final AppMetadataConfig appMetadataConfig;
     private final WalletProviderConfig walletProviderConfig;
+    private final StatusListValidationService statusListValidationService;
 
     public CredentialIssuerService(AuthleteHelper authleteHelper, AppMetadataConfig appMetadataConfig,
-                                   WalletProviderConfig walletProviderConfig) {
+                                   WalletProviderConfig walletProviderConfig,
+                                   StatusListValidationService statusListValidationService) {
         this.authleteHelper = authleteHelper;
         this.appMetadataConfig = appMetadataConfig;
         this.walletProviderConfig = walletProviderConfig;
+        this.statusListValidationService = statusListValidationService;
     }
 
     // Nonce
@@ -221,19 +224,24 @@ public class CredentialIssuerService {
             }
             logger.debug("WUA signature verified successfully");
 
-            // 6. Check WSCD type policy
+            // 6. Check WUA revocation status via Token Status List
+            if (isWuaRevoked(wuaClaims)) {
+                return null;
+            }
+
+            // 7. Check WSCD type policy
             if (!isWscdTypePolicyCompliant(wuaClaims)) {
                 return null;
             }
 
-            // 7. Extract attested_keys array from WUA
+            // 8. Extract attested_keys array from WUA
             List<Map<String, Object>> attestedKeys = (List<Map<String, Object>>) wuaClaims.getClaim("attested_keys");
             if (attestedKeys == null || attestedKeys.isEmpty()) {
                 logger.warn("⚠️No attested_keys in WUA");
                 return null;
             }
 
-            // 8. Use kid from JWT proof header to index into attested_keys
+            // 9. Use kid from JWT proof header to index into attested_keys
             String kid = outerHeader.getKeyID();
             int keyIndex = 0;
             if (kid != null) {
@@ -249,7 +257,7 @@ public class CredentialIssuerService {
                 return null;
             }
 
-            // 9. Parse and return the JWK
+            // 10. Parse and return the JWK
             Map<String, Object> keyMap = attestedKeys.get(keyIndex);
             JWK walletJwk = JWK.parse(keyMap);
             logger.debug("Extracted wallet key from WUA attested_keys[{}]", keyIndex);
@@ -363,6 +371,46 @@ public class CredentialIssuerService {
         }
 
         return true;
+    }
+
+    /**
+     * Checks WUA revocation status via Token Status List.
+     * Extracts status.status_list.uri and status.status_list.idx from WUA claims,
+     * then queries the status list endpoint to check if the WUA has been revoked.
+     *
+     * @param wuaClaims the WUA JWT claims
+     * @return true if WUA is revoked, false if valid
+     */
+    @SuppressWarnings("unchecked")
+    private boolean isWuaRevoked(JWTClaimsSet wuaClaims) {
+        Map<String, Object> status = (Map<String, Object>) wuaClaims.getClaim("status");
+        if (status == null) {
+            logger.debug("No status claim in WUA, skipping revocation check");
+            return false;
+        }
+
+        Map<String, Object> statusListClaim = (Map<String, Object>) status.get("status_list");
+        if (statusListClaim == null) {
+            logger.debug("No status_list in WUA status claim, skipping revocation check");
+            return false;
+        }
+
+        String statusUri = (String) statusListClaim.get("uri");
+        Number idxNum = (Number) statusListClaim.get("idx");
+
+        if (statusUri == null || idxNum == null) {
+            logger.debug("Missing uri or idx in status_list claim, skipping revocation check");
+            return false;
+        }
+
+        int idx = idxNum.intValue();
+        if (statusListValidationService.isRevoked(statusUri, idx)) {
+            logger.warn("⚠️WUA has been revoked (idx={} in {})", idx, statusUri);
+            return true;
+        }
+
+        logger.debug("WUA status check passed (idx={}, status=valid)", idx);
+        return false;
     }
 
     // Issuance
