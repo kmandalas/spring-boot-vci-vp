@@ -33,7 +33,7 @@ public class CredentialIssuerController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SCOPE_VerifiablePortableDocumentA1')")
+    @PreAuthorize("hasAuthority('SCOPE_eu.europa.ec.eudi.pda1_sd_jwt_vc')")
     public ResponseEntity<Map<String, Object>> issueCredential(@RequestBody CredentialRequest request,
                                                                Authentication authentication) throws Exception {
 
