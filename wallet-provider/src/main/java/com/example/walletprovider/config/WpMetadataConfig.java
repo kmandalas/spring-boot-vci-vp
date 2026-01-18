@@ -76,6 +76,9 @@ public class WpMetadataConfig {
         private String id;
         private String name;
         private String solutionVersion;
+        private String certificationInformation = "N/A";  // TS3: wallet_solution_certification_information
+        private String clientId = "wallet-dev";           // TS3: sub claim (OAuth client ID)
+        private String wscdCertificationInformation = "N/A";  // TS3: wscd_certification_information
 
         public String getId() {
             return id;
@@ -99,6 +102,30 @@ public class WpMetadataConfig {
 
         public void setSolutionVersion(String solutionVersion) {
             this.solutionVersion = solutionVersion;
+        }
+
+        public String getCertificationInformation() {
+            return certificationInformation;
+        }
+
+        public void setCertificationInformation(String certificationInformation) {
+            this.certificationInformation = certificationInformation;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getWscdCertificationInformation() {
+            return wscdCertificationInformation;
+        }
+
+        public void setWscdCertificationInformation(String wscdCertificationInformation) {
+            this.wscdCertificationInformation = wscdCertificationInformation;
         }
     }
 

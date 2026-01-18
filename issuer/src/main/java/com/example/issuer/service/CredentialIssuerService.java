@@ -288,42 +288,90 @@ public class CredentialIssuerService {
 
     /**
      * Validates WSCD type from WUA against configured policy.
-     * Extracts wscd_type from eudi_wallet_info.key_storage_info.storage_certification_information.
+     * Supports both:
+     * - OID4VCI standard: top-level key_storage claim (e.g., ["iso_18045_high"])
+     * - TS3 eudi_wallet_info structure: wscd_info.wscd_certification_information.wscd_type
+     * - Legacy structure: key_storage_info.storage_certification_information.wscd_type
      *
      * @param wuaClaims the WUA JWT claims
      * @return true if WSCD type is allowed by policy, false otherwise
      */
     @SuppressWarnings("unchecked")
     private boolean isWscdTypePolicyCompliant(JWTClaimsSet wuaClaims) {
+        // Option 1: Check top-level key_storage claim (OID4VCI standard)
+        List<String> keyStorage = (List<String>) wuaClaims.getClaim("key_storage");
+        if (keyStorage != null && !keyStorage.isEmpty()) {
+            String keyStorageLevel = keyStorage.get(0);
+            logger.info("WUA key_storage (OID4VCI): {}", keyStorageLevel);
+            // Map ISO 18045 levels to allowed WSCD types
+            String mappedWscdType = mapIso18045ToWscdType(keyStorageLevel);
+            if (!walletProviderConfig.isWscdTypeAllowed(mappedWscdType)) {
+                logger.warn("⚠️key_storage '{}' (mapped to '{}') not allowed by policy (allowed: {})",
+                        keyStorageLevel, mappedWscdType, walletProviderConfig.getAllowedWscdTypes());
+                return false;
+            }
+            return true;
+        }
+
+        // Option 2: Check eudi_wallet_info structure
         Map<String, Object> eudiWalletInfo = (Map<String, Object>) wuaClaims.getClaim("eudi_wallet_info");
         if (eudiWalletInfo == null) {
             logger.debug("No eudi_wallet_info in WUA, skipping WSCD policy check");
             return true;
         }
 
+        // Try new TS3 field names first: wscd_info.wscd_certification_information
+        Map<String, Object> wscdInfo = (Map<String, Object>) eudiWalletInfo.get("wscd_info");
+        if (wscdInfo != null) {
+            Map<String, Object> wscdCertInfo = (Map<String, Object>) wscdInfo.get("wscd_certification_information");
+            if (wscdCertInfo != null) {
+                String wscdType = (String) wscdCertInfo.get("wscd_type");
+                String securityLevel = (String) wscdCertInfo.get("security_level");
+                logger.info("WUA WSCD type: {}, security level: {} (TS3 format)", wscdType, securityLevel);
+                if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
+                    logger.warn("⚠️WSCD type '{}' not allowed by policy (allowed: {})",
+                            wscdType, walletProviderConfig.getAllowedWscdTypes());
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        // Fallback to legacy field names: key_storage_info.storage_certification_information
         Map<String, Object> keyStorageInfo = (Map<String, Object>) eudiWalletInfo.get("key_storage_info");
-        if (keyStorageInfo == null) {
-            logger.debug("No key_storage_info in WUA, skipping WSCD policy check");
-            return true;
+        if (keyStorageInfo != null) {
+            Map<String, Object> storageCertInfo = (Map<String, Object>) keyStorageInfo.get("storage_certification_information");
+            if (storageCertInfo != null) {
+                String wscdType = (String) storageCertInfo.get("wscd_type");
+                String securityLevel = (String) storageCertInfo.get("security_level");
+                logger.info("WUA WSCD type: {}, security level: {} (legacy format)", wscdType, securityLevel);
+                if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
+                    logger.warn("⚠️WSCD type '{}' not allowed by policy (allowed: {})",
+                            wscdType, walletProviderConfig.getAllowedWscdTypes());
+                    return false;
+                }
+                return true;
+            }
         }
 
-        Map<String, Object> storageCertInfo = (Map<String, Object>) keyStorageInfo.get("storage_certification_information");
-        if (storageCertInfo == null) {
-            logger.debug("No storage_certification_information in WUA, skipping WSCD policy check");
-            return true;
-        }
-
-        String wscdType = (String) storageCertInfo.get("wscd_type");
-        String securityLevel = (String) storageCertInfo.get("security_level");
-        logger.info("WUA WSCD type: {}, security level: {}", wscdType, securityLevel);
-
-        if (!walletProviderConfig.isWscdTypeAllowed(wscdType)) {
-            logger.warn("⚠️WSCD type '{}' not allowed by policy (allowed: {})",
-                    wscdType, walletProviderConfig.getAllowedWscdTypes());
-            return false;
-        }
-
+        logger.debug("No WSCD info found in WUA, skipping policy check");
         return true;
+    }
+
+    /**
+     * Maps ISO 18045 attack potential resistance level to WSCD type.
+     */
+    private String mapIso18045ToWscdType(String iso18045Level) {
+        if (iso18045Level == null) {
+            return "software";
+        }
+        return switch (iso18045Level) {
+            case "iso_18045_high" -> "strongbox";  // or "tee" - both qualify as high
+            case "iso_18045_moderate" -> "tee";
+            case "iso_18045_enhanced-basic" -> "tee";
+            case "iso_18045_basic" -> "software";
+            default -> "software";
+        };
     }
 
     /**
