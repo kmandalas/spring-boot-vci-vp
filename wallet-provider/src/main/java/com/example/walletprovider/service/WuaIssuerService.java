@@ -39,13 +39,16 @@ public class WuaIssuerService {
     private final WuaRepository wuaRepository;
     private final KeyAttestationService keyAttestationService;
     private final WpSigningService wpSigningService;
+    private final StatusListIndexService statusListIndexService;
 
     public WuaIssuerService(WpMetadataConfig wpMetadataConfig, WuaRepository wuaRepository,
-                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService) {
+                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService,
+                           StatusListIndexService statusListIndexService) {
         this.wpMetadataConfig = wpMetadataConfig;
         this.wuaRepository = wuaRepository;
         this.keyAttestationService = keyAttestationService;
         this.wpSigningService = wpSigningService;
+        this.statusListIndexService = statusListIndexService;
     }
 
     public String generateNonce() {
@@ -94,10 +97,15 @@ public class WuaIssuerService {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(wpMetadataConfig.getTime().getWuaTtlSeconds(), ChronoUnit.SECONDS);
 
-        // Generate WUA JWT
-        String wuaJwt = generateWuaJwt(wuaId, walletKey, attestationData, issuedAt, expiresAt);
+        // Allocate status list index (per IETF Token Status List spec)
+        var statusList = statusListIndexService.getOrCreateActiveList();
+        int statusListIdx = statusListIndexService.allocateIndex(statusList.id());
 
-        // Persist WUA record
+        // Generate WUA JWT with status list reference
+        String wuaJwt = generateWuaJwt(wuaId, walletKey, attestationData, issuedAt, expiresAt,
+                statusList.id(), statusListIdx);
+
+        // Persist WUA record with status list fields
         String thumbprint = walletKey.computeThumbprint().toString();
         WalletUnitAttestation wua = new WalletUnitAttestation(
                 wuaId,
@@ -105,30 +113,33 @@ public class WuaIssuerService {
                 attestationData.wscdType(),
                 attestationData.wscdSecurityLevel(),
                 issuedAt,
-                expiresAt
+                expiresAt,
+                statusList.id(),
+                statusListIdx
         );
         wuaRepository.save(wua);
 
-        logger.info("Issued WUA: id={}, wscdType={}, expires={}",
-                wuaId, attestationData.wscdType(), expiresAt);
+        logger.info("Issued WUA: id={}, wscdType={}, statusListIdx={}, expires={}",
+                wuaId, attestationData.wscdType(), statusListIdx, expiresAt);
 
         return new WuaIssuanceResult(wuaJwt, wuaId);
     }
 
     private String generateWuaJwt(UUID wuaId, JWK walletKey, KeyAttestationData attestationData,
-                                   Instant issuedAt, Instant expiresAt)
+                                   Instant issuedAt, Instant expiresAt,
+                                   String statusListId, int statusListIdx)
             throws JOSEException {
 
         ECKey wpKey = wpSigningService.getSigningKey();
 
-        // Build header with x5c certificate chain
+        // Build header with x5c certificate chain (TS3: typ = "key-attestation+jwt")
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
                 .keyID(wpKey.getKeyID())
-                .type(new JOSEObjectType("wua+jwt"))
+                .type(new JOSEObjectType("key-attestation+jwt"))
                 .x509CertChain(wpSigningService.getX5cChain())
                 .build();
 
-        // Build claims per ARF TS3
+        // Build attested_keys array (TS3 Section 2.3.4)
         Map<String, Object> attestedKey = new LinkedHashMap<>();
         attestedKey.put("kty", walletKey.getKeyType().getValue());
         if (walletKey instanceof ECKey ecKey) {
@@ -142,36 +153,48 @@ public class WuaIssuerService {
             }
         }
 
+        // TS3 Section 2.3.1: general_info
         Map<String, Object> generalInfo = new LinkedHashMap<>();
         generalInfo.put("wallet_provider_name", wpMetadataConfig.getProvider().getName());
         generalInfo.put("wallet_solution_id", wpMetadataConfig.getProvider().getId());
         generalInfo.put("wallet_solution_version", wpMetadataConfig.getProvider().getSolutionVersion());
+        generalInfo.put("wallet_solution_certification_information", wpMetadataConfig.getProvider().getCertificationInformation());
 
-        Map<String, Object> storageCertInfo = new LinkedHashMap<>();
-        storageCertInfo.put("wscd_type", attestationData.wscdType());
-        storageCertInfo.put("security_level", attestationData.wscdSecurityLevel());
-        storageCertInfo.put("attestation_version", attestationData.attestationVersion());
+        // TS3 Section 2.3.2: wscd_info (was key_storage_info)
+        Map<String, Object> wscdCertInfo = new LinkedHashMap<>();
+        wscdCertInfo.put("wscd_type", attestationData.wscdType());
+        wscdCertInfo.put("security_level", attestationData.wscdSecurityLevel());
+        wscdCertInfo.put("attestation_version", attestationData.attestationVersion());
 
-        Map<String, Object> keyStorageInfo = new LinkedHashMap<>();
-        keyStorageInfo.put("storage_type", "LOCAL_NATIVE");
-        keyStorageInfo.put("storage_certification_information", storageCertInfo);
+        Map<String, Object> wscdInfo = new LinkedHashMap<>();
+        wscdInfo.put("wscd_type", "LOCAL_NATIVE");  // TS3: REMOTE, LOCAL_EXTERNAL, LOCAL_INTERNAL, LOCAL_NATIVE, HYBRID
+        wscdInfo.put("wscd_certification_information", wscdCertInfo);
 
+        // TS3 Section 2.3.4: eudi_wallet_info
         Map<String, Object> eudiWalletInfo = new LinkedHashMap<>();
         eudiWalletInfo.put("general_info", generalInfo);
-        eudiWalletInfo.put("key_storage_info", keyStorageInfo);
+        eudiWalletInfo.put("wscd_info", wscdInfo);
 
-        Map<String, Object> statusList = new LinkedHashMap<>();
-        statusList.put("uri", wpMetadataConfig.getEndpoints().getStatus() + "/" + wuaId);
+        // Token Status List reference per IETF draft-ietf-oauth-status-list
+        Map<String, Object> statusListClaim = new LinkedHashMap<>();
+        statusListClaim.put("idx", statusListIdx);
+        statusListClaim.put("uri", wpMetadataConfig.getEndpoints().getStatusList() + "/" + statusListId);
 
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("status_list", statusList);
+        status.put("status_list", statusListClaim);
+
+        // TS3 Section 2.3: Map WSCD type to ISO 18045 attack potential resistance
+        String keyStorageResistance = mapWscdToIso18045(attestationData.wscdType());
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(wpMetadataConfig.getClaims().getIss())
+                .subject(wpMetadataConfig.getProvider().getClientId())  // TS3: sub = client_id
+                .jwtID(wuaId.toString())  // RFC 7519: jti = unique JWT identifier
                 .issueTime(Date.from(issuedAt))
                 .expirationTime(Date.from(expiresAt))
-                .claim("wua_id", wuaId.toString())
                 .claim("attested_keys", List.of(attestedKey))
+                .claim("key_storage", List.of(keyStorageResistance))  // OID4VCI: top-level key_storage
+                .claim("user_authentication", List.of(keyStorageResistance))  // OID4VCI: top-level user_authentication
                 .claim("eudi_wallet_info", eudiWalletInfo)
                 .claim("status", status)
                 .build();
@@ -182,6 +205,22 @@ public class WuaIssuerService {
         signedJWT.sign(signer);
 
         return signedJWT.serialize();
+    }
+
+    /**
+     * Maps Android WSCD type to ISO 18045 attack potential resistance level.
+     * Per TS3 Section 2.3: key_storage indicates attack potential resistance.
+     */
+    private String mapWscdToIso18045(String wscdType) {
+        if (wscdType == null) {
+            return "iso_18045_basic";
+        }
+        return switch (wscdType.toLowerCase()) {
+            case "strongbox" -> "iso_18045_high";
+            case "tee" -> "iso_18045_high";  // TEE also qualifies as high for WSCD
+            case "software" -> "iso_18045_basic";
+            default -> "iso_18045_basic";
+        };
     }
 
     private JWK validateProof(String proofJwt) {

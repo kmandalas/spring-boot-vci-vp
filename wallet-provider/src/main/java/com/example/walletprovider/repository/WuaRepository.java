@@ -19,8 +19,8 @@ public class WuaRepository {
     public void save(WalletUnitAttestation wua) {
         jdbcClient.sql("""
             INSERT INTO wallet_unit_attestations
-            (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at)
-            VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt)
+            (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx)
+            VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt, :statusListId, :statusListIdx)
             """)
             .param("wuaId", wua.wuaId())
             .param("walletPublicKeyThumbprint", wua.walletPublicKeyThumbprint())
@@ -29,6 +29,8 @@ public class WuaRepository {
             .param("wscdSecurityLevel", wua.wscdSecurityLevel())
             .param("issuedAt", wua.issuedAt())
             .param("expiresAt", wua.expiresAt())
+            .param("statusListId", wua.statusListId())
+            .param("statusListIdx", wua.statusListIdx())
             .update();
     }
 
@@ -53,4 +55,15 @@ public class WuaRepository {
             .optional()
             .isPresent();
     }
+
+    /**
+     * Find all WUAs in a specific status list (for generating status list token).
+     */
+    public java.util.List<WalletUnitAttestation> findByStatusListId(String statusListId) {
+        return jdbcClient.sql("SELECT * FROM wallet_unit_attestations WHERE status_list_id = :statusListId")
+            .param("statusListId", statusListId)
+            .query(WalletUnitAttestation.class)
+            .list();
+    }
+
 }
