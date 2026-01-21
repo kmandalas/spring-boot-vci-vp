@@ -14,6 +14,13 @@ spring:
       authorizationserver:
         issuer: http://${LOCAL_IP:localhost}:9000
 
+app:
+  wallet-attestation:
+    trusted-issuers:
+      - http://${LOCAL_IP:localhost}:9001/wp
+    max-pop-age-seconds: 300
+    max-wia-age-seconds: 86400
+
 ---
 spring:
   config:
@@ -24,3 +31,10 @@ spring:
     oauth2:
       authorizationserver:
         issuer: https://vc-auth-server.onrender.com
+
+app:
+  wallet-attestation:
+    trusted-issuers:
+      - https://wallet-provider.kmandalas.com/wp
+    max-pop-age-seconds: 300
+    max-wia-age-seconds: 86400

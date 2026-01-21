@@ -1,5 +1,9 @@
 package com.example.authserver.config;
 
+import com.example.authserver.wia.WalletAttestationAuthenticationConverter;
+import com.example.authserver.wia.WalletAttestationAuthenticationProvider;
+import com.example.authserver.wia.WalletAttestationAuthenticationToken;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -32,11 +36,31 @@ import static org.springframework.security.oauth2.server.authorization.settings.
 @Configuration
 public class AuthorizationServerConfig {
 
+    private final WalletAttestationProperties walletAttestationProperties;
+    private final String authorizationServerIssuer;
+
+    public AuthorizationServerConfig(
+            WalletAttestationProperties walletAttestationProperties,
+            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer) {
+        this.walletAttestationProperties = walletAttestationProperties;
+        this.authorizationServerIssuer = authorizationServerIssuer;
+    }
+
     @Bean
     @Order(1)
-    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            RegisteredClientRepository registeredClientRepository) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 OAuth2AuthorizationServerConfigurer.authorizationServer();
+
+        // Create WIA authentication components
+        WalletAttestationAuthenticationConverter wiaConverter = new WalletAttestationAuthenticationConverter();
+        WalletAttestationAuthenticationProvider wiaProvider = new WalletAttestationAuthenticationProvider(
+                registeredClientRepository,
+                walletAttestationProperties,
+                authorizationServerIssuer
+        );
 
         http
             .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
@@ -44,6 +68,13 @@ public class AuthorizationServerConfig {
                 .authorizationEndpoint(authorizationEndpoint ->
                     authorizationEndpoint.consentPage("/oauth2/consent")
                 )
+                // Register WIA authentication for client authentication
+                .clientAuthentication(clientAuth -> clientAuth
+                    .authenticationConverter(wiaConverter)
+                    .authenticationProvider(wiaProvider)
+                )
+                // Enable PAR endpoint
+                .pushedAuthorizationRequestEndpoint(withDefaults())
                 .oidc(oidc -> oidc
                     .providerConfigurationEndpoint(providerConfigurationEndpoint ->
                         providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration ->
@@ -82,6 +113,8 @@ public class AuthorizationServerConfig {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 // Public client support for mobile wallets (no client secret, uses PKCE + DPoP)
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                // WIA-based authentication per draft-ietf-oauth-attestation-based-client-auth
+                .clientAuthenticationMethod(WalletAttestationAuthenticationToken.ATTEST_JWT_CLIENT_AUTH)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUris(uris -> uris.addAll(redirectUris))
                 .scope("eu.europa.ec.eudi.pda1_sd_jwt_vc")

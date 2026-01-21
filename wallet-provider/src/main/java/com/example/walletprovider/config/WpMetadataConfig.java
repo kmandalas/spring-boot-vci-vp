@@ -133,6 +133,7 @@ public class WpMetadataConfig {
         private long nonceTtlSeconds = 300;
         private long maxProofAgeSeconds = 300;
         private long wuaTtlSeconds = 86400;
+        private long wiaTtlSeconds = 86400;  // WIA TTL (default: 24 hours)
 
         public long getNonceTtlSeconds() {
             return nonceTtlSeconds;
@@ -156,6 +157,14 @@ public class WpMetadataConfig {
 
         public void setWuaTtlSeconds(long wuaTtlSeconds) {
             this.wuaTtlSeconds = wuaTtlSeconds;
+        }
+
+        public long getWiaTtlSeconds() {
+            return wiaTtlSeconds;
+        }
+
+        public void setWiaTtlSeconds(long wiaTtlSeconds) {
+            this.wiaTtlSeconds = wiaTtlSeconds;
         }
     }
 

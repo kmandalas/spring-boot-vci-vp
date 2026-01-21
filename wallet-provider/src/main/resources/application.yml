@@ -49,6 +49,7 @@ wp:
       nonce-ttl-seconds: 300
       max-proof-age-seconds: 300
       wua-ttl-seconds: 86400
+      wia-ttl-seconds: 86400
   attestation:
     # Set to true to skip Google root CA validation (for emulator testing)
     skip-chain-validation: true
