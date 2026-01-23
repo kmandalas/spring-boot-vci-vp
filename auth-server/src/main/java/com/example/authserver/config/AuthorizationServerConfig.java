@@ -14,7 +14,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -24,6 +26,9 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -35,6 +40,8 @@ import static org.springframework.security.oauth2.server.authorization.settings.
 
 @Configuration
 public class AuthorizationServerConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthorizationServerConfig.class);
 
     private final WalletAttestationProperties walletAttestationProperties;
     private final String authorizationServerIssuer;
@@ -107,7 +114,9 @@ public class AuthorizationServerConfig {
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
         Set<String> redirectUris = getRedirectUris();
-        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+        String clientInternalId = UUID.randomUUID().toString();
+        logger.info("Creating RegisteredClientRepository with client internal ID: {}", clientInternalId);
+        RegisteredClient registeredClient = RegisteredClient.withId(clientInternalId)
                 .clientId("wallet-client")
                 .clientSecret("{noop}wallet-secret")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
@@ -154,6 +163,12 @@ public class AuthorizationServerConfig {
                 .build();
 
         return new InMemoryUserDetailsManager(user1, user2, user3);
+    }
+
+    @Bean
+    public OAuth2AuthorizationService authorizationService() {
+        logger.info("Creating InMemoryOAuth2AuthorizationService bean");
+        return new InMemoryOAuth2AuthorizationService();
     }
 
     @Bean
