@@ -15,8 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * - Android Key Attestation validates hardware-backed key
  * - Nonce prevents replay attacks
  *
- * Production: Add wallet authentication via OAuth2 Client Credentials or WIA.
- * The Wallet Provider Interface (WPI) is proprietary per ARF - not standardized.
+ * Production: The Wallet Provider Interface (WPI) is proprietary per ARF - not standardized.
  */
 @Configuration
 public class SecurityConfig {
