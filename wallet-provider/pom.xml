@@ -26,7 +26,7 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Security (for public/protected endpoint config) -->
+        <!-- Security (for future public/protected endpoint config) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
