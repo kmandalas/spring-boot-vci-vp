@@ -2,10 +2,14 @@ package com.example.authserver.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
@@ -24,22 +28,40 @@ public class AuthorizationConsentController {
 
     private final RegisteredClientRepository registeredClientRepository;
     private final OAuth2AuthorizationConsentService authorizationConsentService;
+    private final OAuth2AuthorizationService authorizationService;
 
     public AuthorizationConsentController(RegisteredClientRepository registeredClientRepository,
-                                          OAuth2AuthorizationConsentService authorizationConsentService) {
+                                          OAuth2AuthorizationConsentService authorizationConsentService,
+                                          OAuth2AuthorizationService authorizationService) {
         this.registeredClientRepository = registeredClientRepository;
         this.authorizationConsentService = authorizationConsentService;
+        this.authorizationService = authorizationService;
     }
 
     @GetMapping(value = "/oauth2/consent")
     public String consent(Principal principal, Model model,
                           @RequestParam(OAuth2ParameterNames.CLIENT_ID) String clientId,
-                          @RequestParam(OAuth2ParameterNames.SCOPE) String scope,
+                          @RequestParam(name = OAuth2ParameterNames.SCOPE, required = false) String scope,
                           @RequestParam(OAuth2ParameterNames.STATE) String state,
                           @RequestParam(name = OAuth2ParameterNames.USER_CODE, required = false) String userCode) {
 
         logger.info("Consent page requested - clientId: '{}', scope: '{}', state: '{}', principal: '{}'",
                 clientId, scope, state, principal.getName());
+
+        // PAR scope enrichment: When scope is empty but state exists, look up the stored PAR authorization
+        String effectiveScope = scope;
+        if (!StringUtils.hasText(scope) && StringUtils.hasText(state)) {
+            OAuth2Authorization authorization = authorizationService.findByToken(
+                    state, new OAuth2TokenType(OAuth2ParameterNames.STATE));
+            if (authorization != null) {
+                OAuth2AuthorizationRequest storedRequest =
+                        authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
+                if (storedRequest != null && storedRequest.getScopes() != null && !storedRequest.getScopes().isEmpty()) {
+                    effectiveScope = String.join(" ", storedRequest.getScopes());
+                    logger.info("PAR: Retrieved scope from stored authorization: '{}'", effectiveScope);
+                }
+            }
+        }
 
         // Remove scopes that were already approved
         Set<String> scopesToApprove = new HashSet<>();
@@ -47,13 +69,6 @@ public class AuthorizationConsentController {
         RegisteredClient registeredClient = this.registeredClientRepository.findByClientId(clientId);
         logger.debug("RegisteredClient lookup - found: {}, internalId: {}",
                 registeredClient != null, registeredClient != null ? registeredClient.getId() : "N/A");
-
-        // Workaround for PAR: if scope is empty, use all scopes from registered client
-        String effectiveScope = scope;
-        if (!StringUtils.hasText(scope) && registeredClient != null) {
-            effectiveScope = String.join(" ", registeredClient.getScopes());
-            logger.debug("Scope was empty, using registered client scopes: {}", effectiveScope);
-        }
 
         OAuth2AuthorizationConsent currentAuthorizationConsent =
                 this.authorizationConsentService.findById(registeredClient.getId(), principal.getName());

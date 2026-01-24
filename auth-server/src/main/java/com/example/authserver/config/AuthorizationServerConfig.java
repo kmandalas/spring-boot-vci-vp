@@ -3,6 +3,8 @@ package com.example.authserver.config;
 import com.example.authserver.wia.WalletAttestationAuthenticationConverter;
 import com.example.authserver.wia.WalletAttestationAuthenticationProvider;
 import com.example.authserver.wia.WalletAttestationAuthenticationToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,9 +28,6 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -55,8 +54,7 @@ public class AuthorizationServerConfig {
 
     @Bean
     @Order(1)
-    SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http,
+    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
             RegisteredClientRepository registeredClientRepository) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 OAuth2AuthorizationServerConfigurer.authorizationServer();
@@ -73,7 +71,8 @@ public class AuthorizationServerConfig {
             .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
             .with(authorizationServerConfigurer, authServer -> authServer
                 .authorizationEndpoint(authorizationEndpoint ->
-                    authorizationEndpoint.consentPage("/oauth2/consent")
+                    authorizationEndpoint
+                        .consentPage("/oauth2/consent")
                 )
                 // Register WIA authentication for client authentication
                 .clientAuthentication(clientAuth -> clientAuth
@@ -115,6 +114,7 @@ public class AuthorizationServerConfig {
     public RegisteredClientRepository registeredClientRepository() {
         Set<String> redirectUris = getRedirectUris();
         String clientInternalId = UUID.randomUUID().toString();
+
         logger.info("Creating RegisteredClientRepository with client internal ID: {}", clientInternalId);
         RegisteredClient registeredClient = RegisteredClient.withId(clientInternalId)
                 .clientId("wallet-client")
@@ -167,7 +167,7 @@ public class AuthorizationServerConfig {
 
     @Bean
     public OAuth2AuthorizationService authorizationService() {
-        logger.info("Creating InMemoryOAuth2AuthorizationService bean");
+        logger.info("Creating InMemoryOAuth2AuthorizationService bean...");
         return new InMemoryOAuth2AuthorizationService();
     }
 
