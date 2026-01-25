@@ -95,6 +95,7 @@
                         <buildArg>-H:IncludeResources=.*\.pem$</buildArg>
                         <buildArg>-H:IncludeResources=.*\.yml$</buildArg>
                         <buildArg>-H:IncludeResources=google_hardware_attestation_root\.pem</buildArg>
+                        <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/com.example/wallet-provider/reflect-config.json</buildArg>
                     </buildArgs>
                 </configuration>
             </plugin>
