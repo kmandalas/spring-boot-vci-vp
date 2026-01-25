@@ -45,6 +45,16 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>0.10.6</version>
+                <configuration>
+                    <buildArgs>
+                        <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/com.example/auth-server/reflect-config.json</buildArg>
+                    </buildArgs>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
