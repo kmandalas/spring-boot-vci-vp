@@ -35,6 +35,6 @@ spring:
 app:
   wallet-attestation:
     trusted-issuers:
-      - https://wallet-provider.kmandalas.com/wp
+      - https://wallet-provider.onrender.com/wp
     max-pop-age-seconds: 300
     max-wia-age-seconds: 86400
