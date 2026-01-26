@@ -91,6 +91,7 @@
                 <version>0.10.6</version>
                 <configuration>
                     <buildArgs>
+                        <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                         <buildArg>-H:IncludeResources=.*\.json$</buildArg>
                         <buildArg>-H:IncludeResources=.*\.pem$</buildArg>
                         <buildArg>-H:IncludeResources=.*\.yml$</buildArg>
