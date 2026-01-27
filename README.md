@@ -3,7 +3,11 @@ Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disc
 Full related article [here](https://dzone.com/articles/verifiable-credentials-spring-boot-android)
 
 <details>
-<summary> 🚧 WIP - most recent branch is "wia" </summary>
+<summary> 🚧 WIP / Under Construction </summary>
+    Most recent branch: "wia"
+    DZone articles following up:
+    - https://dzone.com/articles/securing-verifiable-credentials-with-dpop-spring-boot
+    - https://dzone.com/articles/haip-1-0-securing-verifiable-presentations
 </details>
 
 
