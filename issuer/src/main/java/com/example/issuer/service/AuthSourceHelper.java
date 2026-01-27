@@ -1,43 +1,78 @@
 package com.example.issuer.service;
 
-import com.authlete.sd.Disclosure;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
 public class AuthSourceHelper {
 
     public Map<String, Object> getNormalClaims(String username) {
-        // Example static mapping
+        // Return empty - no non-standard claims for strict PDA1 compliance
+        // The EU verifier may reject credentials with unexpected claims
+        return Map.of();
+    }
+
+    /**
+     * Returns credential holder data as a plain Map for recursive selective disclosure.
+     * Each nested field will become a separate disclosure.
+     */
+    public Map<String, Object> getCredentialHolder(String username) {
         return switch (username) {
-            case "testuser1" -> Map.of("company", "UserCorp");
-            case "testuser2" -> Map.of("company", "AdminCorp");
-            case "testuser3" -> Map.of("company", "GuestCorp");
-            default -> Map.of("company", "Unknown");
+            case "testuser1" -> createLinkedMap(
+                    "family_name", "Testopoulos",
+                    "given_name", "Nikos",
+                    "birth_date", "1990-01-01"
+            );
+            case "testuser2" -> createLinkedMap(
+                    "family_name", "Validescu",
+                    "given_name", "Alina",
+                    "birth_date", "1985-05-15"
+            );
+            case "testuser3" -> createLinkedMap(
+                    "family_name", "Testorov",
+                    "given_name", "Tudor",
+                    "birth_date", "1992-08-22"
+            );
+            default -> Map.of();
         };
     }
 
-    public List<Disclosure> getDisclosableClaims(String username) {
+    /**
+     * Returns competent institution data as a plain Map for recursive selective disclosure.
+     * Each nested field will become a separate disclosure.
+     */
+    public Map<String, Object> getCompetentInstitution(String username) {
         return switch (username) {
-            case "testuser1" -> List.of(
-                    new Disclosure("credential_holder", "Nikos Testopoulos"),
-                    new Disclosure("nationality", "Greek \uD83C\uDDEC\uD83C\uDDF7"),
-                    new Disclosure("competent_institution", "EOPYY")
+            case "testuser1" -> createLinkedMap(
+                    "country_code", "GR",
+                    "institution_id", "EOPYY-001",
+                    "institution_name", "EOPYY"
             );
-            case "testuser2" -> List.of(
-                    new Disclosure("credential_holder", "Alina Validescu"),
-                    new Disclosure("nationality", "Romanian \uD83C\uDDF7\uD83C\uDDF4"),
-                    new Disclosure("competent_institution", "CNAS")
+            case "testuser2" -> createLinkedMap(
+                    "country_code", "RO",
+                    "institution_id", "CNAS-001",
+                    "institution_name", "CNAS"
             );
-            case "testuser3" -> List.of(
-                    new Disclosure("credential_holder", "Tudor Testorov"),
-                    new Disclosure("nationality", "Bulgarian \uD83C\uDDE7\uD83C\uDDEC"),
-                    new Disclosure("competent_institution", "НЗОК")
+            case "testuser3" -> createLinkedMap(
+                    "country_code", "BG",
+                    "institution_id", "NZOK-001",
+                    "institution_name", "NZOK"
             );
-            default -> List.of();
+            default -> Map.of();
         };
+    }
+
+    /**
+     * Helper to create a LinkedHashMap with predictable key ordering.
+     */
+    private Map<String, Object> createLinkedMap(String k1, Object v1, String k2, Object v2, String k3, Object v3) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        map.put(k3, v3);
+        return map;
     }
 
 }

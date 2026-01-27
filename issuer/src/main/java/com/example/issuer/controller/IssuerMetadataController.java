@@ -56,15 +56,20 @@ public class IssuerMetadataController {
 
     private List<Map<String, Object>> buildClaimsMetadata() {
         return List.of(
-                buildClaimMetadata("credential_holder", "Credential Holder", true),
-                buildClaimMetadata("nationality", "Nationality", true),
-                buildClaimMetadata("competent_institution", "Competent Institution", true)
+                // credential_holder nested claims
+                buildClaimMetadata(List.of("credential_holder", "family_name"), "Family Name", true),
+                buildClaimMetadata(List.of("credential_holder", "given_name"), "Given Name", true),
+                buildClaimMetadata(List.of("credential_holder", "birth_date"), "Birth Date", false),
+                // competent_institution nested claims
+                buildClaimMetadata(List.of("competent_institution", "country_code"), "Country Code", true),
+                buildClaimMetadata(List.of("competent_institution", "institution_id"), "Institution ID", false),
+                buildClaimMetadata(List.of("competent_institution", "institution_name"), "Institution Name", true)
         );
     }
 
-    private Map<String, Object> buildClaimMetadata(String path, String displayName, boolean mandatory) {
+    private Map<String, Object> buildClaimMetadata(List<String> path, String displayName, boolean mandatory) {
         return Map.of(
-                "path", List.of(path),
+                "path", path,
                 "display", List.of(Map.of("name", displayName, "locale", "en")),
                 "mandatory", mandatory
         );
