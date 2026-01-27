@@ -1,6 +1,8 @@
 package com.example.verifier.service;
 
+import com.authlete.sd.Disclosure;
 import com.authlete.sd.SDJWT;
+import com.authlete.sd.SDObjectDecoder;
 import com.example.verifier.config.AppConfig;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,7 +20,10 @@ import java.net.URL;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
-import java.util.*;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class VpValidationService {
@@ -38,8 +43,8 @@ public class VpValidationService {
     /**
      * Result of VP validation containing status and disclosed claims.
      */
-    public record ValidationResult(boolean valid, String issuer, Map<String, String> disclosedClaims, String error) {
-        public static ValidationResult success(String issuer, Map<String, String> claims) {
+    public record ValidationResult(boolean valid, String issuer, Map<String, Object> disclosedClaims, String error) {
+        public static ValidationResult success(String issuer, Map<String, Object> claims) {
             return new ValidationResult(true, issuer, claims, null);
         }
 
@@ -93,7 +98,7 @@ public class VpValidationService {
             logger.info("VP signature verification successful");
 
             // Step 7: Extract disclosed claims
-            Map<String, String> claims = extractDisclosedClaims(vpToken);
+            Map<String, Object> claims = extractDisclosedClaims(vpToken);
 
             return ValidationResult.success(issuer, claims);
 
@@ -147,33 +152,71 @@ public class VpValidationService {
     }
 
     /**
-     * Extracts disclosed claims from an SD-JWT VP token.
+     * Extracts disclosed claims from an SD-JWT VP token using SDObjectDecoder.
+     * This properly reconstructs nested claim structures from recursive disclosures.
      */
-    private Map<String, String> extractDisclosedClaims(String sdJwt) {
-        Map<String, String> claims = new LinkedHashMap<>();
+    private Map<String, Object> extractDisclosedClaims(String sdJwt) {
+        try {
+            // Parse the SD-JWT to get credential JWT and disclosures
+            SDJWT vp = SDJWT.parse(sdJwt);
 
-        String[] parts = sdJwt.split("~", -1);
-        List<String> disclosures = Arrays.stream(parts)
-                .skip(1)
-                .filter(d -> !d.isEmpty() && !d.contains("."))  // Skip empty and JWT-style
-                .toList();
+            // Parse credential JWT payload to get the encoded structure with _sd arrays
+            String[] jwtParts = vp.getCredentialJwt().split("\\.");
+            String payloadJson = new String(Base64.getUrlDecoder().decode(jwtParts[1]));
+            Map<String, Object> payload = objectMapper.readValue(payloadJson, new TypeReference<>() {});
 
-        for (String disclosure : disclosures) {
-            try {
-                byte[] decodedBytes = Base64.getUrlDecoder().decode(disclosure);
-                String decodedJson = new String(decodedBytes);
-                List<String> claimData = objectMapper.readValue(decodedJson, new TypeReference<>() {});
+            // Get the list of disclosures from the VP
+            List<Disclosure> disclosures = vp.getDisclosures();
 
-                if (claimData.size() >= 3) {
-                    claims.put(claimData.get(1), claimData.get(2));
-                }
-            } catch (Exception e) {
-                logger.warn("⚠️Error decoding disclosure: {}", disclosure);
+            // Use SDObjectDecoder for recursive decoding
+            // This properly reconstructs nested structures with only the revealed fields
+            SDObjectDecoder decoder = new SDObjectDecoder();
+            Map<String, Object> decoded = decoder.decode(payload, disclosures);
+
+            // Clean up _sd artifacts from all levels (top-level and nested)
+            cleanSdArtifacts(decoded);
+
+            logger.info("Extracted claims: {}", decoded.keySet());
+            return decoded;
+
+        } catch (Exception e) {
+            logger.error("Error extracting disclosed claims", e);
+            return Map.of();
+        }
+    }
+
+    /**
+     * Recursively removes _sd and _sd_alg artifacts from decoded claims.
+     */
+    @SuppressWarnings("unchecked")
+    private void cleanSdArtifacts(Map<String, Object> map) {
+        map.remove("_sd");
+        map.remove("_sd_alg");
+        for (Object value : map.values()) {
+            if (value instanceof Map) {
+                cleanSdArtifacts((Map<String, Object>) value);
             }
         }
+    }
 
-        logger.info("Extracted {} disclosed claims", claims.size());
-        return claims;
+    /**
+     * Flattens nested claims for display purposes.
+     * Converts nested Map structures to dot-notation keys.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, String> flattenClaimsForDisplay(Map<String, Object> claims) {
+        Map<String, String> flattened = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : claims.entrySet()) {
+            if (entry.getValue() instanceof Map) {
+                Map<String, Object> nested = (Map<String, Object>) entry.getValue();
+                for (Map.Entry<String, Object> nestedEntry : nested.entrySet()) {
+                    flattened.put(entry.getKey() + "." + nestedEntry.getKey(), String.valueOf(nestedEntry.getValue()));
+                }
+            } else {
+                flattened.put(entry.getKey(), String.valueOf(entry.getValue()));
+            }
+        }
+        return flattened;
     }
 
     /**

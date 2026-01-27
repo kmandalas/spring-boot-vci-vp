@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/verifier")
@@ -69,7 +71,6 @@ public class VerifierController {
                                     ),
                                     "claims", List.of(
                                             Map.of("path", List.of("credential_holder")),
-                                            Map.of("path", List.of("nationality")),
                                             Map.of("path", List.of("competent_institution"))
                                     )
                             )
@@ -226,9 +227,10 @@ public class VerifierController {
             presentationRequestService.removeRequest(requestId);
 
             if (result.valid()) {
-                // Log disclosed claims
+                // Log disclosed claims (flattened for display)
                 logger.info("✅ Disclosed claims from issuer '{}':", result.issuer());
-                result.disclosedClaims().forEach((k, v) -> logger.info("   - {}: {}", k, v));
+                vpValidationService.flattenClaimsForDisplay(result.disclosedClaims())
+                        .forEach((k, v) -> logger.info("   - {}: {}", k, v));
                 return ResponseEntity.ok("✅ VP Token is valid!");
             } else {
                 return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
