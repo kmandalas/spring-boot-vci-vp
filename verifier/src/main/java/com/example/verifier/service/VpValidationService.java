@@ -21,7 +21,6 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -153,8 +152,11 @@ public class VpValidationService {
 
     /**
      * Extracts disclosed claims from an SD-JWT VP token using SDObjectDecoder.
-     * This properly reconstructs nested claim structures from recursive disclosures.
+     * Handles two-level selective disclosure by re-decoding nested maps whose
+     * _sd arrays were not resolved during the first pass (the Authlete decoder
+     * does not recurse into claim values revealed by disclosures).
      */
+    @SuppressWarnings("unchecked")
     private Map<String, Object> extractDisclosedClaims(String sdJwt) {
         try {
             // Parse the SD-JWT to get credential JWT and disclosures
@@ -168,12 +170,23 @@ public class VpValidationService {
             // Get the list of disclosures from the VP
             List<Disclosure> disclosures = vp.getDisclosures();
 
-            // Use SDObjectDecoder for recursive decoding
-            // This properly reconstructs nested structures with only the revealed fields
+            // First pass: decode top-level _sd entries
             SDObjectDecoder decoder = new SDObjectDecoder();
             Map<String, Object> decoded = decoder.decode(payload, disclosures);
 
-            // Clean up _sd artifacts from all levels (top-level and nested)
+            // Second pass: the Authlete decoder does not recurse into values
+            // revealed by disclosures, so nested maps may still contain _sd arrays.
+            // Re-decode any nested map that still has an _sd key.
+            for (Map.Entry<String, Object> entry : decoded.entrySet()) {
+                if (entry.getValue() instanceof Map) {
+                    Map<String, Object> nested = (Map<String, Object>) entry.getValue();
+                    if (nested.containsKey("_sd")) {
+                        entry.setValue(decoder.decode(nested, disclosures));
+                    }
+                }
+            }
+
+            // Clean up _sd artifacts from all levels
             cleanSdArtifacts(decoded);
 
             logger.info("Extracted claims: {}", decoded.keySet());
@@ -197,26 +210,6 @@ public class VpValidationService {
                 cleanSdArtifacts((Map<String, Object>) value);
             }
         }
-    }
-
-    /**
-     * Flattens nested claims for display purposes.
-     * Converts nested Map structures to dot-notation keys.
-     */
-    @SuppressWarnings("unchecked")
-    public Map<String, String> flattenClaimsForDisplay(Map<String, Object> claims) {
-        Map<String, String> flattened = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : claims.entrySet()) {
-            if (entry.getValue() instanceof Map) {
-                Map<String, Object> nested = (Map<String, Object>) entry.getValue();
-                for (Map.Entry<String, Object> nestedEntry : nested.entrySet()) {
-                    flattened.put(entry.getKey() + "." + nestedEntry.getKey(), String.valueOf(nestedEntry.getValue()));
-                }
-            } else {
-                flattened.put(entry.getKey(), String.valueOf(entry.getValue()));
-            }
-        }
-        return flattened;
     }
 
     /**

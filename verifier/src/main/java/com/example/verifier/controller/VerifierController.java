@@ -227,10 +227,9 @@ public class VerifierController {
             presentationRequestService.removeRequest(requestId);
 
             if (result.valid()) {
-                // Log disclosed claims (flattened for display)
-                logger.info("✅ Disclosed claims from issuer '{}':", result.issuer());
-                vpValidationService.flattenClaimsForDisplay(result.disclosedClaims())
-                        .forEach((k, v) -> logger.info("   - {}: {}", k, v));
+                String claimsJson = objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(result.disclosedClaims());
+                logger.info("VP verified - issuer='{}', disclosed claims:\n{}", result.issuer(), claimsJson);
                 return ResponseEntity.ok("✅ VP Token is valid!");
             } else {
                 return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
