@@ -2,27 +2,39 @@ spring:
   application:
     name: demo-issuer
 
+  ssl:
+    bundle:
+      pem:
+        issuer-signing:
+          keystore:
+            certificate: classpath:issuer_cert.pem
+            private-key: classpath:issuer_key.pem
+
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://192.168.1.6:9000
+          issuer-uri: http://${LOCAL_IP:localhost}:9000
 
 logging:
   level:
-    # DPoP authentication
-    org.springframework.security: TRACE
+    # DPoP authentication (use TRACE only when debugging auth issues)
+    org.springframework.security: DEBUG
 
 app:
   metadata:
     endpoints:
-      issuer: http://192.168.1.6:8080
-      authorization: http://192.168.1.6:9000
-      credential: http://192.168.1.6/credential
+      issuer: http://${LOCAL_IP:localhost}:8080
+      authorization: http://${LOCAL_IP:localhost}:9000
+      credential: http://${LOCAL_IP:localhost}:8080/credential
     claims:
-      audience: http://192.168.1.6:8080
+      audience: http://${LOCAL_IP:localhost}:8080
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: http://192.168.1.6/credential
+      iss: http://${LOCAL_IP:localhost}:8080
+  wallet-provider:
+    trusted-issuers:
+      - http://${LOCAL_IP:localhost}:9001/wp
+    allowed-wscd-types: all  # Options: all, software, tee, strongbox (comma-separated)
 
 ---
 spring:
@@ -34,15 +46,19 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: https://vc-auth-server.kmandalas.com
+          issuer-uri: https://vc-auth-server.onrender.com
 
 app:
   metadata:
     endpoints:
-      issuer: https://vc-issuer.kmandalas.com
-      authorization: https://vc-auth-server.kmandalas.com
-      credential: https://vc-issuer.kmandalas.com/credential
+      issuer: https://vc-issuer.onrender.com
+      authorization: https://vc-auth-server.onrender.com
+      credential: https://vc-issuer.onrender.com/credential
     claims:
-      audience: https://vc-issuer.kmandalas.com
+      audience: https://vc-issuer.onrender.com
       vct: "urn:eu.europa.ec.eudi:pda1:1"
-      iss: https://vc-issuer.kmandalas.com/credential
+      iss: https://vc-issuer.onrender.com
+  wallet-provider:
+    trusted-issuers:
+      - https://wallet-provider.onrender.com/wp
+    allowed-wscd-types: all

@@ -12,8 +12,8 @@ FROM ghcr.io/linuxcontainers/alpine:3.20
 VOLUME /tmp
 RUN apk add --no-cache libc6-compat
 
-# Set the Spring profile to 'production'
-ENV SPRING_PROFILES_ACTIVE=production
+# Set the Spring profile to 'cloud'
+ENV SPRING_PROFILES_ACTIVE=cloud
 
 COPY --from=build /workspace/app/target/auth-server /app/auth-server
 

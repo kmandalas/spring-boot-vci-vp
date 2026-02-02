@@ -1,0 +1,78 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: wallet-provider
+
+  ssl:
+    bundle:
+      pem:
+        wp-signing:
+          keystore:
+            certificate: classpath:wp_cert.pem
+            private-key: classpath:wp_key.pem
+
+  datasource:
+    url: jdbc:h2:file:./data/walletprovider;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  sql:
+    init:
+      mode: always
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+wp:
+  metadata:
+    endpoints:
+      issuer: http://${LOCAL_IP:localhost}:9001/wp
+      credential: http://${LOCAL_IP:localhost}:9001/wp/wua/credential
+      jwks: http://${LOCAL_IP:localhost}:9001/wp/.well-known/jwks.json
+      status-list: http://${LOCAL_IP:localhost}:9001/wp/.well-known/status-list
+    claims:
+      audience: http://${LOCAL_IP:localhost}:9001/wp
+      iss: http://${LOCAL_IP:localhost}:9001/wp
+    provider:
+      id: demo.wallet.provider
+      name: Demo Wallet Provider
+      solution-version: 1.0.0
+      certification-information: "N/A"  # TS3: wallet_solution_certification_information
+      client-id: wallet-dev              # TS3: sub claim (OAuth client ID)
+      wscd-certification-information: "N/A"  # TS3: wscd_certification_information
+    time:
+      nonce-ttl-seconds: 300
+      max-proof-age-seconds: 300
+      wua-ttl-seconds: 86400
+      wia-ttl-seconds: 86400
+  attestation:
+    # Set to true to skip Google root CA validation (for emulator testing)
+    skip-chain-validation: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+
+  datasource:
+    url: jdbc:h2:file:./data/walletprovider-cloud;AUTO_SERVER=TRUE
+
+wp:
+  metadata:
+    endpoints:
+      issuer: https://wallet-provider.onrender.com/wp
+      credential: https://wallet-provider.onrender.com/wp/wua/credential
+      jwks: https://wallet-provider.onrender.com/wp/.well-known/jwks.json
+      status-list: https://wallet-provider.onrender.com/wp/.well-known/status-list
+    claims:
+      audience: https://wallet-provider.onrender.com/wp
+      iss: https://wallet-provider.onrender.com/wp
+  attestation:
+    # Production: should always validate certificate chain
+    skip-chain-validation: true

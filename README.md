@@ -1,6 +1,24 @@
 # Spring Boot SD-JWT & VCI/VP Demo
-Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup.
-Full related article [here](https://dzone.com/articles/verifiable-credentials-spring-boot-android)
+Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
+
+Related articles:
+- [Verifiable Credentials with Spring Boot & Android](https://dzone.com/articles/verifiable-credentials-spring-boot-android)
+- [Securing Verifiable Credentials with DPoP](https://dzone.com/articles/securing-verifiable-credentials-with-dpop-spring-boot)
+- [HAIP 1.0: Securing Verifiable Presentations](https://dzone.com/articles/haip-1-0-securing-verifiable-presentations)
+- More articles covering WIA, WUA, and Token Status List coming soon.
+
+## Architecture
+
+The system consists of four independent Spring Boot applications:
+
+| Module | Port | Description |
+|--------|------|-------------|
+| **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
+| **issuer** | 8080 | Credential Issuer — validates WUA + Token Status List, issues SD-JWT credentials |
+| **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, and encrypted responses |
+| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
+
+---
 
 <details>
 <summary>🚧 <strong>WIP / Under Construction</strong></summary>
@@ -16,15 +34,15 @@ Full related article [here](https://dzone.com/articles/verifiable-credentials-sp
 
 ## VCI
 
-### Wallet-Initiated Issuance after Installation 
+### Wallet-Initiated Issuance after Installation
 
 The End-User installs a new Wallet and opens it. The Wallet offers the End-User a selection of Credentials that the End-User may obtain from a Credential Issuer, e.g. a national identity Credential, a mobile driving license, or a public transport ticket. The corresponding Credential Issuers (and their URLs) are pre-configured by the Wallet or follow some discovery processes that are out of scope for this specification. By clicking on one of these options corresponding to the Credentials available for issuance, the issuance process starts using a flow supported by the Credential Issuer (Pre-Authorized Code flow or Authorization Code flow).
 
 Wallet Providers may also provide a marketplace where Issuers can register to be found for Wallet-initiated flows.
 
 References:
+- https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-3.3.3
 - https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-wallet-initiated-issuance-a
-- https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow
 
 ```
 sequenceDiagram
@@ -43,28 +61,41 @@ sequenceDiagram
 
     User->>IssuerAuthServer: Provides credentials and consent
     IssuerAuthServer-->>WalletApp: Redirect with auth code (via deep link)
-    WalletApp->>IssuerAuthServer: Exchange code for access token
-    IssuerAuthServer-->>WalletApp: Respond with access token
+    WalletApp->>WalletApp: Generate DPoP proof
+    WalletApp->>IssuerAuthServer: Exchange code for access token (with DPoP)
+    IssuerAuthServer-->>WalletApp: Respond with DPoP-bound access token
     WalletApp->>WalletApp: Prepare credential request with JWT proof
-    WalletApp->>Issuer: Call credential endpoint with JWT proof
-    Issuer->>Issuer: Validate credential request and JWT proof
+    WalletApp->>Issuer: Call credential endpoint with JWT proof + DPoP
+    Issuer->>Issuer: Validate DPoP proof and JWT proof
     Issuer->>AuthenticSource: Retrieve user credentials
     AuthenticSource-->>Issuer: Return credentials
-    Issuer->>Issuer: Prepare SD-JWT
-    Issuer-->>WalletApp: Return SD-JWT
-    WalletApp->>WalletApp: Verify SD-JWT signature from Issuer
+    Issuer->>Issuer: Prepare SD-JWT with x5c header
+    Issuer-->>WalletApp: Return SD-JWT (dc+sd-jwt format)
+    WalletApp->>WalletApp: Verify SD-JWT signature using x5c certificate
     WalletApp->>WalletApp: Decode & Display verifiable credentials
     WalletApp->>WalletApp: Save credentials in Encrypted Shared Preferences
 ```
 
 ![vci-auth-code-flow.png](vci-auth-code-flow.png)
 
+#### Issuance Enhancements
+
+The VCI flow incorporates several security mechanisms beyond the basic Authorization Code Flow:
+
+- **PAR (Pushed Authorization Requests)** — The wallet pushes authorization parameters to a dedicated endpoint before redirecting, preventing request tampering and reducing URL size (RFC 9126).
+- **WIA + `attest_jwt_client_auth`** — At the PAR and Token endpoints the wallet presents a Wallet Instance Attestation (WIA) JWT issued by the wallet-provider together with a Proof-of-Possession JWT, implementing attestation-based client authentication per `draft-ietf-oauth-attestation-based-client-auth`.
+- **DPoP** — Access tokens are sender-constrained via Demonstrating Proof-of-Possession (RFC 9449). The auth-server binds tokens to the wallet's DPoP key, and the issuer verifies the binding on each request.
+- **WUA at credential endpoint** — The wallet includes a Wallet Unit Attestation (WUA) in the `key_attestation` header of the JWT proof. The issuer validates the WUA signature, checks the attested WSCD type (TEE/StrongBox), and verifies WUA revocation status against the wallet-provider's Token Status List before issuing the credential.
+
 #### SD-JWT
+
+The credential is issued in `dc+sd-jwt` format with an x5c certificate chain in the header for signature verification.
 
 Sample (demo):
 ```
-eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xLjY1L2NyZWRlbnRpYWwiLCJfc2QiOlsiVTdHSWJoLTl0NHlockhxZHN0OHp5bzdac1lyNmtRM2pnc2NCY1R1c21YVSIsIlhGT2V6WFpVZXBpOEZpQ3R0dFNoZVIzcEFYRE4tQXdnTC1MV0p2eldUX00iLCJicDk3WnlhOEtQR0tfYmtvUmRabHhSVDN4aklTcXJoeGVONVdZUlNleWhNIl0sImNuZiI6eyJqd2siOnsia3R5IjoiRUMiLCJjcnYiOiJQLTI1NiIsImtpZCI6IndhbGxldC1rZXkiLCJ4IjoiUE5CYS1hS1AyTnAteU1PZkpOZ0JUY1Bvc3Z1MUUyM0o4SE5DR1VPLUhYdyIsInkiOiJLNDlqbDFNU1A0OUo2bHhLcExpRGt4YU1ZLUVSYnZOX1NlclhqZW85SlowIiwiYWxnIjoiRVMyNTYifX0sImNvbXBhbnkiOiJVc2VyQ29ycCIsImlhdCI6MTc0NjIyMjcyNywidmN0IjoidXJuOmV1LmV1cm9wYS5lYy5ldWRpOnBkYTE6MSJ9.NoLijxtEQVO9mZRK4b6vSb5jdcggQ5X8so8K9XKy8uOtDnSMQssGg0Y-YLKO-EcLH6IA1GacbSlJtl39IeESMg~WyJRd2xtMU4tQXBLOUlEQUxSZ25kM0dnIiwiY3JlZGVudGlhbF9ob2xkZXIiLCJOaWtvcyBUZXN0b3BvdWxvcyJd~WyJ6a3BiTDBVcDNPYzRxeFkza1EtaTdRIiwibmF0aW9uYWxpdHkiLCJHcmVlayDwn4es8J-HtyJd~WyJtdjVGT09SbDF3ZXZWQnRQR2t4NkdBIiwiY29tcGV0ZW50X2luc3RpdHV0aW9uIiwiRU9QWVkiXQ~
+eyJ4NWMiOlsiTUlJQmtUQ0NBVGVnQXdJQkFnSVVkeVljbDE5ZFlCSjhtY1hHc2NqVXN4c2k2RGt3Q2dZSUtvWkl6ajBFQXdJd0hqRWNNQm9HQTFVRUF3d1RkbU10YVhOemRXVnlMbVYxWkdsM0xtUmxkakFlRncweU5qQXhNREl5TVRVeE1UbGFGdzB5TnpBeE1ESXlNVFV4TVRsYU1CNHhIREFhQmdOVkJBTU1FM1pqTFdsemMzVmxjaTVsZFdScGR5NWtaWFl3V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPUFFNQkJ3TkNBQVJ3Y08waG9qaFNOYzdvT3BTRHpYWWF0SnBvLzJKOENPSWxPOVdHRlpmR1JZVEhNalVjZTlBT0VhczVEU0NZQmREZ284WFVsM29XYXU2UC9KdytmbmlYbzFNd1VUQWRCZ05WSFE0RUZnUVVUVm82S2xNYjZxMkZETFg1UXFPMUV4NkM3b0l3SHdZRFZSMGpCQmd3Rm9BVVRWbzZLbE1iNnEyRkRMWDVRcU8xRXg2QzdvSXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpRUE2SXJlSU5TV3VyZFFQbjFtNGZCWDJCU2dMa1R4V3ZLOVBRTHgxN0FPaWdZQ0lHZWJZNlkyNnliUEhObnhRMkVpOW1CTFMrK1QwVWN0MXJQVWczQjkzdlJtIl0sImtpZCI6Imlzc3Vlci1rZXktMSIsInR5cCI6ImRjK3NkLWp3dCIsImFsZyI6IkVTMjU2In0.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xMDAuNDQvY3JlZGVudGlhbCIsIl9zZCI6WyI3N2RZam5IeDM3RXJvWFdiMEk0Q3hSdS1KNVJKZG9SZWZsVS1mTHNObzljIiwiZTFpOTNVbnNTenR1QzJ3X1AyZnFxdU95Q01QX1VXYWJCdU16T1plRnVXbyIsInFqbndxTm5sekZXRFNWY0NCTDZYMGlrNHkyQXd0T245cDVuRkJ6Z3RUU0EiXSwiY25mIjp7Imp3ayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoid2FsbGV0LWtleSIsIngiOiJ5WEFjd05UN0dRZlhwQzJIVmdSRmJlckgycjdYMzl1YXd0VkNaU1hTQVVVIiwieSI6IlNTY1QyWER0dHRqVkVaakRWdkNwaV9DbVY5TEJINUlwYkZoZmpMYjdKaTQiLCJhbGciOiJFUzI1NiJ9fSwiY29tcGFueSI6IlVzZXJDb3JwIiwiaWF0IjoxNzY3Nzg2ODM2LCJ2Y3QiOiJ1cm46ZXUuZXVyb3BhLmVjLmV1ZGk6cGRhMToxIn0.8szE4ppARFl4fVOYWboVeZHBiS0YquxxVG2Hza_Lpw8w-yU-fLOTvPRK4HC4a1Yub2S8kASSsBiZuSXhgLkiRA
 ```
+
 💡 Paste it on https://www.sdjwt.co for inspection.
 
 ![sdjwt.png](sdjwt.png)
@@ -80,7 +111,9 @@ Additionally, you can watch a screen recording that walks through the entire flo
 
 ## VP
 
-### Same Device Flow (our demo) 🧪
+### Same Device Flow (our demo)
+
+The verifier uses JWT-Secured Authorization Request (JAR) with x5c certificate chain for request authentication, and the wallet encrypts the VP response using ECDH-ES + A256GCM.
 
 ```
 sequenceDiagram
@@ -89,109 +122,135 @@ sequenceDiagram
     participant V as Verifier
     participant IS as Issuer
     UA ->> V: Trigger presentation
-    V ->> V: Initiate transaction
-    V -->> V: Authorization request as request_uri
-    V -->> UA: Render request as deep link
+    V ->> V: Generate ephemeral encryption key pair
+    V ->> V: Create authorization request with DCQL query
+    V ->> V: Sign request as JAR (JWT with x5c header)
+    V -->> UA: Render request as QR/deep link (haip-vp://)
     UA ->> W: Trigger wallet and pass request
-    W ->> V: Get authorization request via request_uri
-    V -->> W: authorization_request
-    W ->> W: Parse authorization request
-    alt opt
-        W ->> V: Get presentation definition
-        V -->> W: presentation_definition
-    end
+    W ->> V: GET request_uri (Accept: application/oauth-authz-req+jwt)
+    V -->> W: Signed JAR
+    W ->> W: Verify JAR signature using x5c certificate
+    W ->> W: Validate x509_hash matches client_id
+    W ->> W: Parse DCQL query from verified JWT
     W ->> W: Fetch locally stored VC
-    W ->> W: Prompt user for selective discosure 
-    W ->> W: Prepare response
-    W ->> V: Post vp_token response
-    V ->> IS: Fetch issuer's Public key
-    V ->> V: Verify vp_token's credential JWT
-    V ->> V: Verity vp_token's binding JWT
-    V ->> V: Perform other validations and prepare response
-    V -->> W: Return response_code
+    W ->> W: Prompt user for selective disclosure
+    W ->> W: Create VP with Key Binding JWT
+    W ->> W: Encrypt response (ECDH-ES + A256GCM)
+    W ->> V: POST encrypted vp_token (direct_post.jwt)
+    V ->> V: Decrypt response with ephemeral private key
+    V ->> IS: Fetch issuer's public key (or use x5c from credential)
+    V ->> V: Verify SD-JWT credential signature
+    V ->> V: Verify Key Binding JWT
+    V -->> W: Return verification result
     W ->> W: Display verification outcome
 ```
 
 ![vp-same-device-flow.png](vp-same-device-flow.png)
 
+### DCQL Query
 
-### Input Descriptor samples
-
-#### Presentation definition
+The verifier uses DCQL (Digital Credentials Query Language) to request specific claims from credentials.
 
 Sample (demo):
 ```json
 {
-  "client_id": "verifier-backend.eudiw.cgn",
+  "client_id": "x509_hash:a54_NCUlnbgC-1PfaZIppUTinKy4ITcmSo6KtXxyFCE",
   "response_type": "vp_token",
-  "response_mode": "direct_post",
-  "response_uri": "<REPLACE_WITH_APP_CONFIG_RESPONSE_URI>",
-  "nonce": "abc123",
-  "presentation_definition": {
-    "id": "presentation-definition-1",
-    "name": "Portable Document A1 (PDA1)",
-    "purpose": "Demo data sharing requirements",
-    "input_descriptors": [
+  "response_mode": "direct_post.jwt",
+  "response_uri": "https://verifier.example.com/verify-vp/{requestId}",
+  "nonce": "e2c1d8f1-ffc1-4412-871d-94a4bc14a6b5",
+  "dcql_query": {
+    "credentials": [
       {
-        "id": "input-descriptor-1",
-        "format": {
-          "vc+sd-jwt": {
-            "alg": ["ES256"]
-          }
+        "id": "pda1_credential",
+        "format": "dc+sd-jwt",
+        "meta": {
+          "vct_values": ["urn:eu.europa.ec.eudi:pda1:1"]
         },
-        "constraints": {
-          "fields": [
-            {
-              "path": ["$.vct"],
-              "optional": "false",
-              "filter": {
-                "type": "string",
-                "const": "urn:eu.europa.ec.eudi:pda1:1"
-              }
-            },
-            {
-              "path": ["$.credential_holder"],
-              "optional": "false"
-            },
-            {
-              "path": ["$.nationality"],
-              "optional": "false"
-            },
-            {
-              "path": ["$.competent_institution"],
-              "optional": "false"
-            }
-          ]
-        }
+        "claims": [
+          { "path": ["credential_holder"] },
+          { "path": ["nationality"] },
+          { "path": ["competent_institution"] }
+        ]
       }
     ]
   },
   "client_metadata": {
     "client_name": "Demo Verifier Inc.",
-    "logo_uri": "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120"
+    "logo_uri": "https://example.com/logo.png",
+    "purpose": "Verify your Portable Document A1 credentials",
+    "jwks": {
+      "keys": [{ "kty": "EC", "crv": "P-256", "...": "ephemeral encryption key" }]
+    },
+    "authorization_encrypted_response_alg": "ECDH-ES",
+    "authorization_encrypted_response_enc": "A256GCM"
   }
 }
 ```
 
-#### vp_token
+### vp_token Response
 
-Sample (demo):
+The wallet sends an encrypted JWE containing the vp_token in DCQL format:
+
+```json
+{
+  "vp_token": {
+    "pda1_credential": ["<SD-JWT with disclosures and KB-JWT>"]
+  },
+  "state": "optional-state-value"
+}
 ```
-eyJraWQiOiJpc3N1ZXIta2V5LTEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xLjY1L2NyZWRlbnRpYWwiLCJfc2QiOlsiVTdHSWJoLTl0NHlockhxZHN0OHp5bzdac1lyNmtRM2pnc2NCY1R1c21YVSIsIlhGT2V6WFpVZXBpOEZpQ3R0dFNoZVIzcEFYRE4tQXdnTC1MV0p2eldUX00iLCJicDk3WnlhOEtQR0tfYmtvUmRabHhSVDN4aklTcXJoeGVONVdZUlNleWhNIl0sImNuZiI6eyJqd2siOnsia3R5IjoiRUMiLCJjcnYiOiJQLTI1NiIsImtpZCI6IndhbGxldC1rZXkiLCJ4IjoiUE5CYS1hS1AyTnAteU1PZkpOZ0JUY1Bvc3Z1MUUyM0o4SE5DR1VPLUhYdyIsInkiOiJLNDlqbDFNU1A0OUo2bHhLcExpRGt4YU1ZLUVSYnZOX1NlclhqZW85SlowIiwiYWxnIjoiRVMyNTYifX0sImNvbXBhbnkiOiJVc2VyQ29ycCIsImlhdCI6MTc0NjIyMjcyNywidmN0IjoidXJuOmV1LmV1cm9wYS5lYy5ldWRpOnBkYTE6MSJ9.NoLijxtEQVO9mZRK4b6vSb5jdcggQ5X8so8K9XKy8uOtDnSMQssGg0Y-YLKO-EcLH6IA1GacbSlJtl39IeESMg~WyJRd2xtMU4tQXBLOUlEQUxSZ25kM0dnIiwiY3JlZGVudGlhbF9ob2xkZXIiLCJOaWtvcyBUZXN0b3BvdWxvcyJd~WyJtdjVGT09SbDF3ZXZWQnRQR2t4NkdBIiwiY29tcGV0ZW50X2luc3RpdHV0aW9uIiwiRU9QWVkiXQ~eyJraWQiOiJ3YWxsZXQta2V5IiwidHlwIjoia2Irand0IiwiYWxnIjoiRVMyNTYifQ.eyJzZF9oYXNoIjoiUmlrT1ExeUk2VDlQamVEd0MzdFFHV3lwU1lrbUNySHN4aXpvY0w2VmRBWSIsImF1ZCI6Imh0dHBzOi8vdmVyaWZpZXIuZXhhbXBsZS5jb20iLCJpYXQiOjE3NDYyMjQ1MjQsIm5vbmNlIjoiZTJjMWQ4ZjEtZmZjMS00NDEyLTg3MWQtOTRhNGJjMTRhNmI1In0.4EeRKGOA5Kbr0UeOkhW6e5yft4Z785DefnLfnDf-6S21a9-3nCo3Rbvl_TRhOr-yB_dRp_h2bUafVtbQItelwg
+
+Sample vp_token (demo):
+```
+eyJ4NWMiOlsiTUlJQmtUQ0NBVGVnQXdJQkFnSVVkeVljbDE5ZFlCSjhtY1hHc2NqVXN4c2k2RGt3Q2dZSUtvWkl6ajBFQXdJd0hqRWNNQm9HQTFVRUF3d1RkbU10YVhOemRXVnlMbVYxWkdsM0xtUmxkakFlRncweU5qQXhNREl5TVRVeE1UbGFGdzB5TnpBeE1ESXlNVFV4TVRsYU1CNHhIREFhQmdOVkJBTU1FM1pqTFdsemMzVmxjaTVsZFdScGR5NWtaWFl3V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPUFFNQkJ3TkNBQVJ3Y08waG9qaFNOYzdvT3BTRHpYWWF0SnBvLzJKOENPSWxPOVdHRlpmR1JZVEhNalVjZTlBT0VhczVEU0NZQmREZ284WFVsM29XYXU2UC9KdytmbmlYbzFNd1VUQWRCZ05WSFE0RUZnUVVUVm82S2xNYjZxMkZETFg1UXFPMUV4NkM3b0l3SHdZRFZSMGpCQmd3Rm9BVVRWbzZLbE1iNnEyRkRMWDVRcU8xRXg2QzdvSXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpRUE2SXJlSU5TV3VyZFFQbjFtNGZCWDJCU2dMa1R4V3ZLOVBRTHgxN0FPaWdZQ0lHZWJZNlkyNnliUEhObnhRMkVpOW1CTFMrK1QwVWN0MXJQVWczQjkzdlJtIl0sImtpZCI6Imlzc3Vlci1rZXktMSIsInR5cCI6ImRjK3NkLWp3dCIsImFsZyI6IkVTMjU2In0.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xMDAuNDQvY3JlZGVudGlhbCIsIl9zZCI6WyJIYlpUZ0Qyb1dTXzFlbUo2SW1FVi1aV0FULWN0dGw0bncyaFVJcDJiTXdjIiwiU2pSZXpkRU9xcE1kTVRval82NnpDbjVoMFVibHNlb3ZzeWNQX3BtSFZRcyIsInhmVzFKQU1CdjE4dTJabjA0S3N3V0RMUXJ3RW9ZWkJnekUzcmk0Qk54UkUiXSwiY25mIjp7Imp3ayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoid2FsbGV0LWtleSIsIngiOiJPdy1qcGItc1VMRlQtcGxnR3RxSm9lVUUtVWhBTWNKYVVqa0N1VVJkeHVVIiwieSI6IndxYzhXeWZ1T3RRN0hqSnJvV3VfXzZVZGo4Z3J0V0pBN2t6WEZkSjZxaWciLCJhbGciOiJFUzI1NiJ9fSwiY29tcGFueSI6IlVzZXJDb3JwIiwiaWF0IjoxNzY3ODc1NjY1LCJ2Y3QiOiJ1cm46ZXUuZXVyb3BhLmVjLmV1ZGk6cGRhMToxIn0.Zu5Q9QOh3mxf-7TSA_rtlflh64bLThwsp8JTRWRdgEwmwKsycliE7A47nfGTdbhO-fcJ-12kiqP6U9u2niq8iA
 ```
 
 💡 Paste it on https://www.sdjwt.co for inspection.
 
 ![vptoken.png](vptoken.png)
 
-#### QR code and Button URL
+### QR code and Deep Link
 
-Sample (demo):
+The verifier generates deep links using the `haip-vp://` scheme (HAIP compliant) or `openid4vp://`:
+
 ```
-openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=http%3A%2F%2F192.168.1.65%3A9002%2Fverifier%2Frequest-object%2Fd2858230-7302-489a-9c24-09728d4fe2f3/
+haip-vp://?client_id=x509_hash%3Aa54_NCUlnbgC-1PfaZIppUTinKy4ITcmSo6KtXxyFCE&request_uri=https%3A%2F%2Fverifier.example.com%2Frequest-object%2F{requestId}
 ```
 
 ---
+
+## Wallet Provider
+
+The wallet-provider module acts as the trust anchor for wallet instances and their hardware-backed keys.
+
+**WIA (Wallet Instance Attestation)** — Issues `oauth-client-attestation+jwt` tokens that attest the wallet app's integrity and bind it to an ephemeral public key. The auth-server validates WIA at the PAR and Token endpoints to authenticate wallet clients without shared secrets.
+
+**WUA (Wallet Unit Attestation)** — Issues `key-attestation+jwt` tokens after validating Android Key Attestation certificate chains against Google's root CA. The WUA captures the key's security level (software, TEE, or StrongBox) and maps it to ISO 18045 attack-potential resistance levels. The issuer checks the WUA before issuing credentials.
+
+**Token Status List** — Each WUA is assigned an index in a compressed bitstring published as a signed JWT (`application/statuslist+jwt`) per `draft-ietf-oauth-status-list`. The issuer fetches the status list and checks the relevant bit to determine whether a WUA has been revoked, providing a privacy-preserving revocation mechanism.
+
+---
+
+## HAIP Features
+
+This implementation includes the following HAIP-compliant features:
+
+| Feature | Description |
+|---------|-------------|
+| **PAR** | Pushed Authorization Requests (RFC 9126) |
+| **WIA** | Wallet Instance Attestation with `attest_jwt_client_auth` (`draft-ietf-oauth-attestation-based-client-auth`) |
+| **WUA** | Wallet Unit Attestation for hardware key security with Token Status List revocation |
+| **DPoP** | Demonstrating Proof of Possession for access tokens (RFC 9449) |
+| **JAR with x5c** | JWT-Secured Authorization Requests signed with X.509 certificate |
+| **x509_hash client_id** | Client identification via SHA-256 hash of DER-encoded certificate |
+| **DCQL** | Digital Credentials Query Language for credential requests |
+| **dc+sd-jwt** | HAIP-compliant credential format with x5c header |
+| **VP Encryption** | Response encryption using ECDH-ES + A256GCM |
+| **haip-vp:// scheme** | HAIP-compliant URI scheme for wallet invocation |
+
+---
+
 <details>
 <summary>⚠️ Disclaimer</summary>
 

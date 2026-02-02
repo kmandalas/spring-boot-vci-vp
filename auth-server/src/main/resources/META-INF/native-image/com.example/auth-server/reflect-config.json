@@ -1,0 +1,9 @@
+[
+  {
+    "name": "com.example.authserver.controller.AuthorizationConsentController$ScopeWithDescription",
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  }
+]

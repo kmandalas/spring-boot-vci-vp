@@ -1,15 +1,24 @@
 package com.example.authserver.config;
 
+import com.example.authserver.wia.WalletAttestationAuthenticationConverter;
+import com.example.authserver.wia.WalletAttestationAuthenticationProvider;
+import com.example.authserver.wia.WalletAttestationAuthenticationToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -31,16 +40,56 @@ import static org.springframework.security.oauth2.server.authorization.settings.
 @Configuration
 public class AuthorizationServerConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthorizationServerConfig.class);
+
+    private final WalletAttestationProperties walletAttestationProperties;
+    private final String authorizationServerIssuer;
+
+    public AuthorizationServerConfig(
+            WalletAttestationProperties walletAttestationProperties,
+            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer) {
+        this.walletAttestationProperties = walletAttestationProperties;
+        this.authorizationServerIssuer = authorizationServerIssuer;
+    }
+
     @Bean
     @Order(1)
-    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
+            RegisteredClientRepository registeredClientRepository) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 OAuth2AuthorizationServerConfigurer.authorizationServer();
+
+        // Create WIA authentication components
+        WalletAttestationAuthenticationConverter wiaConverter = new WalletAttestationAuthenticationConverter();
+        WalletAttestationAuthenticationProvider wiaProvider = new WalletAttestationAuthenticationProvider(
+                registeredClientRepository,
+                walletAttestationProperties,
+                authorizationServerIssuer
+        );
 
         http
             .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
             .with(authorizationServerConfigurer, authServer -> authServer
-                .oidc(Customizer.withDefaults())
+                .authorizationEndpoint(authorizationEndpoint ->
+                    authorizationEndpoint
+                        .consentPage("/oauth2/consent")
+                )
+                // Register WIA authentication for client authentication
+                .clientAuthentication(clientAuth -> clientAuth
+                    .authenticationConverter(wiaConverter)
+                    .authenticationProvider(wiaProvider)
+                )
+                // Enable PAR endpoint
+                .pushedAuthorizationRequestEndpoint(withDefaults())
+                .oidc(oidc -> oidc
+                    .providerConfigurationEndpoint(providerConfigurationEndpoint ->
+                        providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration ->
+                            providerConfiguration.scopes(scopes -> {
+                                scopes.add("eu.europa.ec.eudi.pda1_sd_jwt_vc");
+                            })
+                        )
+                    )
+                )
             )
             .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
             // Redirect to login page when not authenticated
@@ -64,15 +113,20 @@ public class AuthorizationServerConfig {
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
         Set<String> redirectUris = getRedirectUris();
-        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+        String clientInternalId = UUID.randomUUID().toString();
+
+        logger.info("Creating RegisteredClientRepository with client internal ID: {}", clientInternalId);
+        RegisteredClient registeredClient = RegisteredClient.withId(clientInternalId)
                 .clientId("wallet-client")
                 .clientSecret("{noop}wallet-secret")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 // Public client support for mobile wallets (no client secret, uses PKCE + DPoP)
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                // WIA-based authentication per draft-ietf-oauth-attestation-based-client-auth
+                .clientAuthenticationMethod(WalletAttestationAuthenticationToken.ATTEST_JWT_CLIENT_AUTH)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUris(uris -> uris.addAll(redirectUris))
-                .scope("VerifiablePortableDocumentA1")
+                .scope("eu.europa.ec.eudi.pda1_sd_jwt_vc")
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(15))
@@ -111,6 +165,16 @@ public class AuthorizationServerConfig {
         return new InMemoryUserDetailsManager(user1, user2, user3);
     }
 
+    @Bean
+    public OAuth2AuthorizationService authorizationService() {
+        logger.info("Creating InMemoryOAuth2AuthorizationService bean...");
+        return new InMemoryOAuth2AuthorizationService();
+    }
+
+    @Bean
+    public OAuth2AuthorizationConsentService authorizationConsentService() {
+        return new InMemoryOAuth2AuthorizationConsentService();
+    }
 
     private static Set<String> getRedirectUris() {
         Set<String> redirectUris = new HashSet<>();
@@ -118,12 +182,5 @@ public class AuthorizationServerConfig {
         redirectUris.add("https://oauth.pstmn.io/v1/callback");
         return redirectUris;
     }
-
-//    @Bean
-//    public AuthorizationServerSettings authorizationServerSettings() {
-//        return AuthorizationServerSettings.builder()
-//                .issuer("http://192.168.1.65:9000") // Ensure this matches your JWT iss claim
-//                .build();
-//    }
 
 }

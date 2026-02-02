@@ -1,106 +1,114 @@
 package com.example.verifier.controller;
 
-import com.authlete.sd.SDJWT;
 import com.example.verifier.config.AppConfig;
-import com.example.verifier.service.AuthleteHelper;
+import com.example.verifier.service.PresentationRequestService;
+import com.example.verifier.service.VpValidationService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.JWKSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/verifier")
 public class VerifierController {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Map<String, String> requestStore = new HashMap<>(); // Temporary in-memory storage for request_uri
+    private static final Logger logger = LoggerFactory.getLogger(VerifierController.class);
 
-    private final AuthleteHelper authleteHelper;
+    private final ObjectMapper objectMapper;
     private final AppConfig appConfig;
+    private final PresentationRequestService presentationRequestService;
+    private final VpValidationService vpValidationService;
 
-    public VerifierController(AuthleteHelper authleteHelper, AppConfig appConfig) {
-        this.authleteHelper = authleteHelper;
+    public VerifierController(ObjectMapper objectMapper,
+                              AppConfig appConfig,
+                              PresentationRequestService presentationRequestService,
+                              VpValidationService vpValidationService) {
+        this.objectMapper = objectMapper;
         this.appConfig = appConfig;
+        this.presentationRequestService = presentationRequestService;
+        this.vpValidationService = vpValidationService;
     }
 
+    /**
+     * Generates an HTML page with QR code and deep links to invoke a wallet for credential presentation.
+     *
+     * <p>This endpoint initiates the OpenID4VP (Verifiable Presentation) flow by:
+     * <ol>
+     *   <li>Building a DCQL query requesting specific claims from a PDA1 credential</li>
+     *   <li>Generating an ephemeral encryption key pair for VP response encryption</li>
+     *   <li>Creating a signed JWT Authorization Request (JAR) with x5c certificate chain</li>
+     *   <li>Storing the request for later retrieval by the wallet</li>
+     *   <li>Returning an HTML page with QR code and deep links (haip-vp:// and openid4vp://)</li>
+     * </ol>
+     *
+     * <p>The wallet retrieves the signed authorization request via {@code /request-object/{requestId}},
+     * verifies the JAR signature using the x5c certificate, and submits the encrypted VP response
+     * to {@code /verify-vp/{requestId}}.
+     *
+     * @return HTML page containing QR code and wallet invocation links
+     * @see #getRequestObject(String) for JAR retrieval
+     * @see #verifyVP(String, String) for VP token verification
+     */
     @GetMapping("/invoke-wallet")
     public ResponseEntity<String> invokeWalletPage() {
         try {
-            // Step 1: Generate a unique requestId
-            String requestId = UUID.randomUUID().toString();
-            String requestUri = appConfig.getRequestUriStore() + requestId;
-
-            /*
-             * Step 2: Create Authorization Request with Nested Presentation Definition
-             *
-             * - note: `client_id`: Verifier identifier (URI or DID). This must match the "sub" field in the VP JWT.
-             * - todo: Since `request_uri` is present, the authorization request is passed by reference (per JAR = JWT-Secured Authorization Request).
-             *     - The `request_uri` must be dereferenced to retrieve the JWT.
-             *     - The JWT will contain the required claims as outlined below.
-             */
-            Map<String, Object> authorizationRequest = Map.of(
-                    "client_id", "verifier-backend.eudiw.cgn",
-                    "response_type", "vp_token",
-                    "response_mode", "direct_post",
-                    "response_uri", appConfig.getResponseUri(),
-                    "nonce", "abc123",
-                    "presentation_definition", Map.of(
-                            "id", "presentation-definition-1",
-                            "name", "Portable Document A1 (PDA1)",
-                            "purpose", "Demo data sharing requirements",
-                            "input_descriptors", List.of(
-                                    Map.of(
-                                            "id", "input-descriptor-1",
-                                            "format", Map.of(
-                                                    "vc+sd-jwt", Map.of("alg", List.of("ES256"))
-                                            ),
-                                            "constraints", Map.of(
-                                                    "fields", List.of(
-                                                            Map.of(
-                                                                    "path", List.of("$.vct"),
-                                                                    "optional", "false",
-                                                                    "filter", Map.of(
-                                                                            "type", "string",
-                                                                            "const", "urn:eu.europa.ec.eudi:pda1:1"
-                                                                    )
-                                                            ),
-                                                            Map.of(
-                                                                    "path", List.of("$.credential_holder"),
-                                                                    "optional", "false"
-                                                            ),
-                                                            Map.of(
-                                                                    "path", List.of("$.nationality"),
-                                                                    "optional", "false"
-                                                            ),
-                                                            Map.of(
-                                                                    "path", List.of("$.competent_institution"),
-                                                                    "optional", "false"
-                                                            )
-                                                    )
-                                            )
+            // DCQL query for PDA1 credential
+            Map<String, Object> dcqlQuery = Map.of(
+                    "credentials", List.of(
+                            Map.of(
+                                    "id", "pda1_credential",
+                                    "format", "dc+sd-jwt",
+                                    "meta", Map.of(
+                                            "vct_values", List.of("urn:eu.europa.ec.eudi:pda1:1")
+                                    ),
+                                    "claims", List.of(
+                                            Map.of("path", List.of("credential_holder")),
+                                            Map.of("path", List.of("competent_institution"))
                                     )
                             )
-                    ),
-                    "client_metadata", Map.of(
-                            "client_name", "Demo Verifier Inc.",
-                            "logo_uri", "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120"
                     )
             );
 
-            // Step 3: Store the request in-memory (so the wallet can retrieve it)
-            requestStore.put(requestId, objectMapper.writeValueAsString(authorizationRequest));
+            // Base client metadata (encryption params added by service)
+            Map<String, Object> clientMetadata = Map.of(
+                    "client_name", "Demo Verifier Inc.",
+                    "logo_uri", "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120",
+                    "purpose", "Verify your Portable Document A1 credentials"
+            );
 
-            // Step 4: Generate the deep link for wallets
-            String deepLink = appConfig.getDeepLinkPrefix() + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
+            // Generate requestId upfront so we can include it in response_uri
+            String requestId = UUID.randomUUID().toString();
+            String responseUriWithId = appConfig.getResponseUri() + "/" + requestId;
 
-            // Step 5: Return an HTML page with the QR code & deep link button
+            // Create presentation request (generates ephemeral encryption key + signs as JAR)
+            presentationRequestService.createPresentationRequest(
+                    requestId,
+                    responseUriWithId,
+                    dcqlQuery,
+                    clientMetadata
+            );
+
+            // Build request URI for wallet to fetch signed authorization request
+            String requestUri = appConfig.getRequestUriStore() + requestId;
+
+            // Get x509_hash client_id from the signing service
+            String clientId = presentationRequestService.getClientId();
+
+            // Generate deep links for both schemes (HAIP and OpenID4VP)
+            String queryParams = "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                    + "&request_uri=" + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
+            String haipDeepLink = "haip-vp://" + queryParams;
+            String openid4vpDeepLink = "openid4vp://" + queryParams;
+
+            // Return an HTML page with QR code (HAIP) & both deep link buttons
             return ResponseEntity.ok("""
                 <html>
                 <head>
@@ -119,6 +127,7 @@ public class VerifierController {
                         .wallet-link {
                             display: inline-block;
                             padding: 10px 20px;
+                            margin: 5px;
                             background-color: #007bff;
                             color: white;
                             text-decoration: none;
@@ -128,21 +137,39 @@ public class VerifierController {
                         .wallet-link:hover {
                             background-color: #0056b3;
                         }
+                        .wallet-link.haip {
+                            background-color: #28a745;
+                        }
+                        .wallet-link.haip:hover {
+                            background-color: #1e7e34;
+                        }
+                        .scheme-label {
+                            font-size: 12px;
+                            color: #666;
+                            margin-top: 10px;
+                        }
                     </style>
                 </head>
                 <body>
                     <h2>Cognity VCI-VP demo</h2>
                     <p>Scan the QR code below with your phone</p>
+                    <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
                     <div id="qrcode"></div>
                     <p>- OR -</p>
-                    <a href="%s" class="wallet-link">OPEN WITH YOUR WALLET</a>
+                    <a href="%s" class="wallet-link haip">HAIP WALLET</a>
+                    <a href="%s" class="wallet-link">OpenID4VP WALLET</a>
                     <script>
                         const deepLink = "%s";
-                        new QRCode(document.getElementById("qrcode"), deepLink);
+                        new QRCode(document.getElementById("qrcode"), {
+                            text: deepLink,
+                            width: 256,
+                            height: 256,
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
                     </script>
                 </body>
                 </html>
-                """.formatted(deepLink, deepLink));
+                """.formatted(haipDeepLink, openid4vpDeepLink, haipDeepLink));
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error generating wallet page: " + e.getMessage());
@@ -150,102 +177,66 @@ public class VerifierController {
     }
 
     /**
-     * Serves pre-stored Presentation Definitions (for Cross-Device Flow only?)
+     * Serves the signed Authorization Request Object as JWT (JAR).
+     * Content-Type: application/oauth-authz-req+jwt
      */
-    @GetMapping("/request-object/{requestId}")
+    @GetMapping(value = "/request-object/{requestId}", produces = "application/oauth-authz-req+jwt")
     public ResponseEntity<String> getRequestObject(@PathVariable String requestId) {
-        String requestData = requestStore.get(requestId);
-        if (requestData == null) {
+        String signedJwt = presentationRequestService.getAuthorizationRequest(requestId);
+        if (signedJwt == null) {
             return ResponseEntity.status(404).body("Request Object Not Found");
         }
-        return ResponseEntity.ok(requestData);
+        return ResponseEntity.ok(signedJwt);
     }
 
     /**
-     * Endpoint for verifying a received VP Token
+     * Endpoint for receiving encrypted VP Token (direct_post.jwt response mode).
+     * The requestId in the path identifies which ephemeral key to use for decryption.
+     * Accepts application/x-www-form-urlencoded as per OpenID4VP spec.
      */
-    @PostMapping("/verify-vp")
-    public ResponseEntity<String> verifyVP(@RequestBody Map<String, String> requestBody) {
+    @PostMapping(value = "/verify-vp/{requestId}", consumes = "application/x-www-form-urlencoded")
+    public ResponseEntity<String> verifyVP(@PathVariable String requestId,
+                                           @RequestParam(value = "response", required = false) String encryptedResponse) {
         try {
-            String vpToken = requestBody.get("vp_token");
-
-            if (vpToken == null || vpToken.isEmpty()) {
-                return ResponseEntity.badRequest().body("❌ No VP Token provided.");
+            if (encryptedResponse == null || encryptedResponse.isEmpty()) {
+                return ResponseEntity.badRequest().body("❌ No encrypted response provided.");
             }
 
-            boolean isValid = validateVPResponse(vpToken);
-            extractDisclosedClaims(vpToken);
-            return isValid ? ResponseEntity.ok("✅ VP Token is valid!") : ResponseEntity.badRequest().body("❌ VP Token validation failed!");
+            // Decrypt the JWE response
+            String decryptedPayload = presentationRequestService.decryptVpResponse(requestId, encryptedResponse);
+
+            // Parse the decrypted payload to extract vp_token
+            Map<String, Object> responsePayload = objectMapper.readValue(decryptedPayload, new TypeReference<>() {});
+
+            // State is optional - log if present but don't validate
+            Object state = responsePayload.get("state");
+            if (state != null) {
+                logger.debug("Received state: {}", state);
+            }
+
+            String vpToken = vpValidationService.extractVpToken(responsePayload.get("vp_token"));
+
+            if (vpToken == null) {
+                return ResponseEntity.badRequest().body("❌ No vp_token in decrypted response.");
+            }
+
+            // Validate VP and extract claims
+            VpValidationService.ValidationResult result = vpValidationService.validateAndExtract(vpToken);
+
+            // Cleanup the request after processing
+            presentationRequestService.removeRequest(requestId);
+
+            if (result.valid()) {
+                String claimsJson = objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(result.disclosedClaims());
+                logger.info("VP verified - issuer='{}', disclosed claims:\n{}", result.issuer(), claimsJson);
+                return ResponseEntity.ok("✅ VP Token is valid!");
+            } else {
+                return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
+            }
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("❌ Error during VP verification: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Validates the VP Token by verifying both the SD-JWT Credential and the Key Binding JWT
-     */
-    private boolean validateVPResponse(String vpToken) {
-        try {
-            // Step 1: Parse the VP Token
-            SDJWT vp = SDJWT.parse(vpToken);
-
-            // Step 2: Fetch Issuer’s Public Key (for SD-JWT validation)
-            // Could be also retrieved from "iss" claim of the payload
-            JWKSet issuerJwkSet = JWKSet.load(new URL(appConfig.getIssuerJwksUrl()));
-            JWK issuerPublicKey = issuerJwkSet.getKeys().get(0);
-
-            // Step 3: do verify
-            authleteHelper.verifyVP(vp, issuerPublicKey);
-            return true; // Both signatures are valid
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private void extractDisclosedClaims(String sdJwt) throws Exception {
-        System.out.println("\nDecoding and verifying SD-JWT...");
-
-        // Step 1: Split into JWT and disclosures
-        String[] parts = sdJwt.split("~", -1);
-        if (parts.length < 1) {
-            throw new IllegalArgumentException("Invalid SD-JWT format");
-        }
-
-        String jwtPart = parts[0];
-        List<String> disclosures = Arrays.stream(parts)
-                .skip(1)
-                .filter(d -> !d.isEmpty())
-                .toList();
-
-        System.out.println("Parsed JWT Part: " + jwtPart);
-        System.out.println("Disclosures Count: " + disclosures.size());
-
-        // Step 2: Decode Disclosures Safely
-        System.out.println("Disclosed Claims:");
-        for (String disclosure : disclosures) {
-            if (disclosure.contains(".")) {
-                System.out.println("Skipping JWT-style disclosure: " + disclosure);
-                continue; // Ignore JWS-style disclosures
-            }
-
-            try {
-                byte[] decodedBytes = Base64.getUrlDecoder().decode(disclosure);
-                String decodedJson = new String(decodedBytes);
-                List<String> claimData = objectMapper.readValue(decodedJson, new TypeReference<>() {});
-
-                if (claimData.size() >= 3) {
-                    String claimName = claimData.get(1);
-                    String claimValue = claimData.get(2);
-                    System.out.println(" - " + claimName + ": " + claimValue);
-                } else {
-                    System.out.println(" - Malformed disclosure: " + decodedJson);
-                }
-            } catch (IllegalArgumentException e) {
-                System.out.println("❌ Error decoding disclosure: " + disclosure);
-                e.printStackTrace();
-            }
         }
     }
 

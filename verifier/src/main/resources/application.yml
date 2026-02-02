@@ -4,12 +4,24 @@ server:
 spring:
   application:
     name: verifier
+  ssl:
+    bundle:
+      pem:
+        verifier-signing:
+          keystore:
+            certificate: classpath:verifier_cert.pem
+            private-key: classpath:verifier_key.pem
+
+logging:
+  level:
+    com.example.verifier: DEBUG
 
 app:
-  request-uri-store: http://192.168.1.65:9002/verifier/request-object/
+  request-uri-store: http://${LOCAL_IP:localhost}:9002/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: http://192.168.1.65:8080/.well-known/jwks.json
-  response-uri: http://192.168.1.65:9002/verifier/verify-vp
+  trusted-issuers:
+    - http://${LOCAL_IP:localhost}:8080
+  response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
 
 ---
 spring:
@@ -18,7 +30,8 @@ spring:
       on-profile: cloud
 
 app:
-  request-uri-store: https://vp-verifier.kmandalas.com/verifier/request-object/
+  request-uri-store: https://vp-verifier.onrender.com/verifier/request-object/
   deep-link-prefix: openid4vp://?client_id=verifier-backend.eudiw.cgn&request_uri=
-  issuer-jwks-url: https://vc-issuer.kmandalas.com/.well-known/jwks.json
-  response-uri: https://vp-verifier.kmandalas.com/verifier/verify-vp
+  trusted-issuers:
+    - https://vc-issuer.onrender.com
+  response-uri: https://vp-verifier.onrender.com/verifier/verify-vp

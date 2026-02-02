@@ -1,0 +1,58 @@
+[
+  {
+    "name": "com.example.walletprovider.model.StatusList",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.KeyAttestationData",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WalletUnitAttestation",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WuaCredentialRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WuaCredentialRequest$Proof",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WuaCredentialRequest$KeyAttestation",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WiaCredentialRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "com.example.walletprovider.model.WiaCredentialRequest$Proof",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allRecordComponents": true
+  }
+]
