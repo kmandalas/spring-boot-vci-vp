@@ -18,20 +18,6 @@ The system consists of four independent Spring Boot applications:
 | **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, and encrypted responses |
 | **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
 
----
-
-<details>
-<summary>🚧 <strong>WIP / Under Construction</strong></summary>
-
-### Current status
-- **Most recent branch:** `wia`
-
-### Follow-up DZone articles
-- [Securing Verifiable Credentials with DPoP (Spring Boot)](https://dzone.com/articles/securing-verifiable-credentials-with-dpop-spring-boot)
-- [HAIP 1.0 – Securing Verifiable Presentations](https://dzone.com/articles/haip-1-0-securing-verifiable-presentations)
-
-</details>
-
 ## VCI
 
 ### Wallet-Initiated Issuance after Installation
