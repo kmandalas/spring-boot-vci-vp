@@ -1,5 +1,18 @@
 # Spring Boot SD-JWT & VCI/VP Demo
-Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. This implementation follows the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification.
+Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
+
+## Architecture
+
+The system consists of four independent Spring Boot applications:
+
+| Module | Port | Description |
+|--------|------|-------------|
+| **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
+| **issuer** | 8080 | Credential Issuer — validates WUA + Token Status List, issues SD-JWT credentials |
+| **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, and encrypted responses |
+| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
+
+---
 
 ## VCI
 
@@ -46,6 +59,15 @@ sequenceDiagram
 ```
 
 ![vci-auth-code-flow.png](vci-auth-code-flow.png)
+
+#### Issuance Enhancements
+
+The VCI flow incorporates several security mechanisms beyond the basic Authorization Code Flow:
+
+- **PAR (Pushed Authorization Requests)** — The wallet pushes authorization parameters to a dedicated endpoint before redirecting, preventing request tampering and reducing URL size (RFC 9126).
+- **WIA + `attest_jwt_client_auth`** — At the PAR and Token endpoints the wallet presents a Wallet Instance Attestation (WIA) JWT issued by the wallet-provider together with a Proof-of-Possession JWT, implementing attestation-based client authentication per `draft-ietf-oauth-attestation-based-client-auth`.
+- **DPoP** — Access tokens are sender-constrained via Demonstrating Proof-of-Possession (RFC 9449). The auth-server binds tokens to the wallet's DPoP key, and the issuer verifies the binding on each request.
+- **WUA at credential endpoint** — The wallet includes a Wallet Unit Attestation (WUA) in the `key_attestation` header of the JWT proof. The issuer validates the WUA signature, checks the attested WSCD type (TEE/StrongBox), and verifies WUA revocation status against the wallet-provider's Token Status List before issuing the credential.
 
 #### SD-JWT
 
@@ -180,12 +202,27 @@ haip-vp://?client_id=x509_hash%3Aa54_NCUlnbgC-1PfaZIppUTinKy4ITcmSo6KtXxyFCE&req
 
 ---
 
+## Wallet Provider
+
+The wallet-provider module acts as the trust anchor for wallet instances and their hardware-backed keys.
+
+**WIA (Wallet Instance Attestation)** — Issues `oauth-client-attestation+jwt` tokens that attest the wallet app's integrity and bind it to an ephemeral public key. The auth-server validates WIA at the PAR and Token endpoints to authenticate wallet clients without shared secrets.
+
+**WUA (Wallet Unit Attestation)** — Issues `key-attestation+jwt` tokens after validating Android Key Attestation certificate chains against Google's root CA. The WUA captures the key's security level (software, TEE, or StrongBox) and maps it to ISO 18045 attack-potential resistance levels. The issuer checks the WUA before issuing credentials.
+
+**Token Status List** — Each WUA is assigned an index in a compressed bitstring published as a signed JWT (`application/statuslist+jwt`) per `draft-ietf-oauth-status-list`. The issuer fetches the status list and checks the relevant bit to determine whether a WUA has been revoked, providing a privacy-preserving revocation mechanism.
+
+---
+
 ## HAIP Features
 
 This implementation includes the following HAIP-compliant features:
 
 | Feature | Description |
 |---------|-------------|
+| **PAR** | Pushed Authorization Requests (RFC 9126) |
+| **WIA** | Wallet Instance Attestation with `attest_jwt_client_auth` (`draft-ietf-oauth-attestation-based-client-auth`) |
+| **WUA** | Wallet Unit Attestation for hardware key security with Token Status List revocation |
 | **DPoP** | Demonstrating Proof of Possession for access tokens (RFC 9449) |
 | **JAR with x5c** | JWT-Secured Authorization Requests signed with X.509 certificate |
 | **x509_hash client_id** | Client identification via SHA-256 hash of DER-encoded certificate |
