@@ -14,8 +14,8 @@ The system consists of four independent Spring Boot applications:
 | Module | Port | Description |
 |--------|------|-------------|
 | **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
-| **issuer** | 8080 | Credential Issuer — validates WUA + Token Status List, issues SD-JWT credentials |
-| **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, and encrypted responses |
+| **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT credentials with revocation support (publishes own Token Status List) |
+| **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, encrypted responses, and Token Status List revocation check |
 | **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
 
 ## VCI
@@ -55,7 +55,8 @@ sequenceDiagram
     Issuer->>Issuer: Validate DPoP proof and JWT proof
     Issuer->>AuthenticSource: Retrieve user credentials
     AuthenticSource-->>Issuer: Return credentials
-    Issuer->>Issuer: Prepare SD-JWT with x5c header
+    Issuer->>Issuer: Allocate Token Status List index
+    Issuer->>Issuer: Prepare SD-JWT with x5c header and status claim
     Issuer-->>WalletApp: Return SD-JWT (dc+sd-jwt format)
     WalletApp->>WalletApp: Verify SD-JWT signature using x5c certificate
     WalletApp->>WalletApp: Decode & Display verifiable credentials
@@ -126,6 +127,7 @@ sequenceDiagram
     V ->> IS: Fetch issuer's public key (or use x5c from credential)
     V ->> V: Verify SD-JWT credential signature
     V ->> V: Verify Key Binding JWT
+    V ->> IS: Check Token Status List (revocation)
     V -->> W: Return verification result
     W ->> W: Display verification outcome
 ```
