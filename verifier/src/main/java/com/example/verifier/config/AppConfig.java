@@ -14,6 +14,7 @@ public class AppConfig {
     private String deepLinkPrefix;
     private List<String> trustedIssuers = new ArrayList<>();
     private String responseUri;
+    private boolean statusCheckEnabled = true;
 
     // Getters and setters
 
@@ -60,6 +61,14 @@ public class AppConfig {
 
     public void setResponseUri(String responseUri) {
         this.responseUri = responseUri;
+    }
+
+    public boolean isStatusCheckEnabled() {
+        return statusCheckEnabled;
+    }
+
+    public void setStatusCheckEnabled(boolean statusCheckEnabled) {
+        this.statusCheckEnabled = statusCheckEnabled;
     }
 
 }

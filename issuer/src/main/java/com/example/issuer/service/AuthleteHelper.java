@@ -43,7 +43,7 @@ public class AuthleteHelper {
      * - Each nested field within parents is also a separate disclosure
      * - Total: 8 disclosures (2 parent + 6 nested)
      */
-    public SDJWT createVC(JWK walletKey, String userIdentifier) throws JOSEException, ParseException {
+    public SDJWT createVC(JWK walletKey, String userIdentifier, int statusIndex, String statusListUri) throws JOSEException, ParseException {
         JWK signingKey = issuerSigningService.getSigningKey();
         List<Base64> x5cChain = issuerSigningService.getX5cChain();
 
@@ -81,6 +81,12 @@ public class AuthleteHelper {
         topLevelBuilder.putClaim("iat", now);
         topLevelBuilder.putClaim("exp", now + oneYearInSeconds);  // EU Reference includes exp
         topLevelBuilder.putClaim("cnf", buildCnfForBindingKey(walletKey));
+        topLevelBuilder.putClaim("status", Map.of(
+                "status_list", Map.of(
+                        "idx", statusIndex,
+                        "uri", statusListUri
+                )
+        ));
 
         // Add normal claims (non-disclosable)
         Map<String, Object> normalClaims = authSourceHelper.getNormalClaims(userIdentifier);

@@ -16,6 +16,7 @@ public class AppMetadataConfig {
         private String issuer;
         private String authorization;
         private String credential;
+        private String statusList;
 
         // Getters and setters
         public String getIssuer() {
@@ -40,6 +41,14 @@ public class AppMetadataConfig {
 
         public void setCredential(String credential) {
             this.credential = credential;
+        }
+
+        public String getStatusList() {
+            return statusList;
+        }
+
+        public void setStatusList(String statusList) {
+            this.statusList = statusList;
         }
     }
 

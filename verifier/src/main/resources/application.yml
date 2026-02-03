@@ -22,6 +22,7 @@ app:
   trusted-issuers:
     - http://${LOCAL_IP:localhost}:8080
   response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
+  status-check-enabled: true
 
 ---
 spring:
@@ -35,3 +36,4 @@ app:
   trusted-issuers:
     - https://vc-issuer.onrender.com
   response-uri: https://vp-verifier.onrender.com/verifier/verify-vp
+  status-check-enabled: true

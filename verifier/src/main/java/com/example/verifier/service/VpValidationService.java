@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
-import java.net.URL;
+import java.net.URI;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
@@ -32,11 +32,14 @@ public class VpValidationService {
     private final AppConfig appConfig;
     private final AuthleteHelper authleteHelper;
     private final ObjectMapper objectMapper;
+    private final StatusListTokenValidator statusListTokenValidator;
 
-    public VpValidationService(AppConfig appConfig, AuthleteHelper authleteHelper, ObjectMapper objectMapper) {
+    public VpValidationService(AppConfig appConfig, AuthleteHelper authleteHelper,
+                               ObjectMapper objectMapper, StatusListTokenValidator statusListTokenValidator) {
         this.appConfig = appConfig;
         this.authleteHelper = authleteHelper;
         this.objectMapper = objectMapper;
+        this.statusListTokenValidator = statusListTokenValidator;
     }
 
     /**
@@ -77,8 +80,8 @@ public class VpValidationService {
             // Step 4: Fetch issuer's public key from JWKS endpoint (key pinning)
             String jwksUrl = issuer + "/.well-known/jwks.json";
             logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
-            JWKSet issuerJwkSet = JWKSet.load(new URL(jwksUrl));
-            JWK jwksKey = issuerJwkSet.getKeys().get(0);
+            JWKSet issuerJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
+            JWK jwksKey = issuerJwkSet.getKeys().getFirst();
             logger.info("Loaded issuer public key from JWKS");
 
             // Step 5: Extract public key from x5c and cross-check with JWKS
@@ -96,7 +99,23 @@ public class VpValidationService {
             authleteHelper.verifyVP(vp, jwksKey);
             logger.info("VP signature verification successful");
 
-            // Step 7: Extract disclosed claims
+            // Step 7: Check credential revocation status (Token Status List)
+            if (appConfig.isStatusCheckEnabled()) {
+                StatusListTokenValidator.StatusCheckResult statusResult =
+                        statusListTokenValidator.checkStatus(credentialJwt.getJWTClaimsSet());
+                switch (statusResult) {
+                    case StatusListTokenValidator.StatusCheckResult.Revoked() ->
+                        { return ValidationResult.failure("Credential has been revoked"); }
+                    case StatusListTokenValidator.StatusCheckResult.Error(String msg) ->
+                        { return ValidationResult.failure("Status check failed: " + msg); }
+                    case StatusListTokenValidator.StatusCheckResult.Valid() ->
+                        logger.info("✅ Credential status check passed");
+                    case StatusListTokenValidator.StatusCheckResult.Skipped() ->
+                        logger.debug("⏭️ No status claim in credential - skipping status check");
+                }
+            }
+
+            // Step 8: Extract disclosed claims
             Map<String, Object> claims = extractDisclosedClaims(vpToken);
 
             return ValidationResult.success(issuer, claims);
@@ -119,7 +138,7 @@ public class VpValidationService {
             }
 
             // Parse leaf certificate (first in chain)
-            byte[] certBytes = x5cChain.get(0).decode();
+            byte[] certBytes = x5cChain.getFirst().decode();
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
             X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
                     new ByteArrayInputStream(certBytes));
@@ -231,8 +250,8 @@ public class VpValidationService {
             Map<String, Object> vpTokenMap = (Map<String, Object>) vpTokenObj;
             for (Object value : vpTokenMap.values()) {
                 if (value instanceof List<?> vpList) {
-                    if (!vpList.isEmpty() && vpList.get(0) instanceof String) {
-                        return (String) vpList.get(0);
+                    if (!vpList.isEmpty() && vpList.getFirst() instanceof String) {
+                        return (String) vpList.getFirst();
                     }
                 }
             }

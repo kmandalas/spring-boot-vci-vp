@@ -2,6 +2,15 @@ spring:
   application:
     name: demo-issuer
 
+  datasource:
+    url: jdbc:h2:file:./data/issuer;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+
   ssl:
     bundle:
       pem:
@@ -27,6 +36,7 @@ app:
       issuer: http://${LOCAL_IP:localhost}:8080
       authorization: http://${LOCAL_IP:localhost}:9000
       credential: http://${LOCAL_IP:localhost}:8080/credential
+      status-list: http://${LOCAL_IP:localhost}:8080/.well-known/status-list
     claims:
       audience: http://${LOCAL_IP:localhost}:8080
       vct: "urn:eu.europa.ec.eudi:pda1:1"
@@ -54,6 +64,7 @@ app:
       issuer: https://vc-issuer.onrender.com
       authorization: https://vc-auth-server.onrender.com
       credential: https://vc-issuer.onrender.com/credential
+      status-list: https://vc-issuer.onrender.com/.well-known/status-list
     claims:
       audience: https://vc-issuer.onrender.com
       vct: "urn:eu.europa.ec.eudi:pda1:1"

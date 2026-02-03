@@ -4,6 +4,9 @@ import com.authlete.sd.SDJWT;
 import com.example.issuer.config.AppMetadataConfig;
 import com.example.issuer.config.WalletProviderConfig;
 import com.example.issuer.model.CredentialRequest;
+import com.example.issuer.model.CredentialStatusEntry;
+import com.example.issuer.model.StatusList;
+import com.example.issuer.repository.CredentialStatusRepository;
 import com.example.issuer.util.JwtSignatureUtils;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -24,6 +27,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -40,14 +44,20 @@ public class CredentialIssuerService {
     private final AppMetadataConfig appMetadataConfig;
     private final WalletProviderConfig walletProviderConfig;
     private final StatusListValidationService statusListValidationService;
+    private final StatusListIndexService statusListIndexService;
+    private final CredentialStatusRepository credentialStatusRepository;
 
     public CredentialIssuerService(AuthleteHelper authleteHelper, AppMetadataConfig appMetadataConfig,
                                    WalletProviderConfig walletProviderConfig,
-                                   StatusListValidationService statusListValidationService) {
+                                   StatusListValidationService statusListValidationService,
+                                   StatusListIndexService statusListIndexService,
+                                   CredentialStatusRepository credentialStatusRepository) {
         this.authleteHelper = authleteHelper;
         this.appMetadataConfig = appMetadataConfig;
         this.walletProviderConfig = walletProviderConfig;
         this.statusListValidationService = statusListValidationService;
+        this.statusListIndexService = statusListIndexService;
+        this.credentialStatusRepository = credentialStatusRepository;
     }
 
     /**
@@ -427,10 +437,25 @@ public class CredentialIssuerService {
             throw new IllegalArgumentException("Wallet key is required for SD-JWT issuance.");
         }
 
-        // Step 2: Create SD-JWT Verifiable Credential (signing key loaded via IssuerSigningService)
-        SDJWT sdJwt = authleteHelper.createVC(walletKey.toPublicJWK(), userIdentifier);
+        // Step 2: Get/create active status list and allocate an index
+        StatusList statusList = statusListIndexService.getOrCreateActiveList();
+        int statusIndex = statusListIndexService.allocateIndex(statusList.id());
+        String statusListUri = appMetadataConfig.getEndpoints().getStatusList() + "/" + statusList.id();
 
-        // Step 3: Return serialized SD-JWT
+        // Step 3: Create SD-JWT Verifiable Credential with status claim
+        SDJWT sdJwt = authleteHelper.createVC(walletKey.toPublicJWK(), userIdentifier, statusIndex, statusListUri);
+
+        // Step 4: Persist credential status entry
+        String credentialId = UUID.randomUUID().toString();
+        CredentialStatusEntry entry = new CredentialStatusEntry(
+                credentialId, userIdentifier, "ACTIVE", statusList.id(), statusIndex, Instant.now()
+        );
+        credentialStatusRepository.save(entry);
+
+        logger.info("Issued credential {} with status list index {} in list {}",
+                credentialId, statusIndex, statusList.id());
+
+        // Step 5: Return serialized SD-JWT
         return sdJwt.toString();
     }
 
