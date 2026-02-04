@@ -42,7 +42,7 @@ public final class JwtSignatureUtils {
             }
 
             // Parse leaf certificate (first in chain)
-            byte[] certBytes = x5cChain.get(0).decode();
+            byte[] certBytes = x5cChain.getFirst().decode();
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
             X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
                     new ByteArrayInputStream(certBytes));

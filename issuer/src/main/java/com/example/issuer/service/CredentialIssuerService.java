@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.net.URL;
+import java.net.URI;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -214,8 +214,8 @@ public class CredentialIssuerService {
 
             // 3. Derive JWKS URL from issuer and fetch Wallet Provider's public key
             String jwksUrl = wuaIssuer + "/.well-known/jwks.json";
-            JWKSet wpJwkSet = JWKSet.load(new URL(jwksUrl));
-            JWK wpJwksKey = wpJwkSet.getKeys().get(0);
+            JWKSet wpJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
+            JWK wpJwksKey = wpJwkSet.getKeys().getFirst();
 
             // 4. Extract x5c from WUA header and cross-check with JWKS (if present)
             JWK x5cKey = JwtSignatureUtils.extractKeyFromX5c(wuaJwt);
@@ -311,7 +311,7 @@ public class CredentialIssuerService {
         // Option 1: Check top-level key_storage claim (OID4VCI standard)
         List<String> keyStorage = (List<String>) wuaClaims.getClaim("key_storage");
         if (keyStorage != null && !keyStorage.isEmpty()) {
-            String keyStorageLevel = keyStorage.get(0);
+            String keyStorageLevel = keyStorage.getFirst();
             logger.info("WUA key_storage (OID4VCI): {}", keyStorageLevel);
             // Map ISO 18045 levels to allowed WSCD types
             String mappedWscdType = mapIso18045ToWscdType(keyStorageLevel);

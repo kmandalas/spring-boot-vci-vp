@@ -363,7 +363,7 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
             }
             if (signingKey == null && !jwkSet.getKeys().isEmpty()) {
                 // Fallback to first key if no kid match
-                signingKey = jwkSet.getKeys().get(0);
+                signingKey = jwkSet.getKeys().getFirst();
             }
 
             if (signingKey == null) {
