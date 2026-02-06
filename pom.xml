@@ -22,6 +22,7 @@
         <module>issuer</module>
         <module>verifier</module>
         <module>wallet-provider</module>
+        <module>wallet-provider-admin</module>
     </modules>
 
 </project>

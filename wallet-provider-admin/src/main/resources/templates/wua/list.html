@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>WUA Management - WUA Admin</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">
+                <i class="bi bi-key me-2"></i> WUA Management
+            </h2>
+            <span class="text-muted" th:text="${totalCount} + ' total records'">0 total records</span>
+        </div>
+
+        <!-- Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form th:action="@{/wua}" method="get" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="">All Statuses</option>
+                            <option th:each="s : ${statuses}" th:value="${s}" th:text="${s}"
+                                    th:selected="${s == currentStatus}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">WSCD Type</label>
+                        <select name="wscdType" class="form-select">
+                            <option value="">All Types</option>
+                            <option th:each="t : ${wscdTypes}" th:value="${t}" th:text="${t}"
+                                    th:selected="${t == currentWscdType}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="search" class="form-control"
+                               placeholder="WUA ID or Thumbprint" th:value="${search}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search me-1"></i> Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- WUA Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>WUA ID</th>
+                                <th>Thumbprint</th>
+                                <th>Status</th>
+                                <th>WSCD Type</th>
+                                <th>Security Level</th>
+                                <th>Issued At</th>
+                                <th>Expires At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="wua : ${wuas}">
+                                <td>
+                                    <a th:href="@{/wua/{id}(id=${wua.wuaId()})}"
+                                       th:text="${#strings.abbreviate(wua.wuaId().toString(), 8)}"
+                                       class="text-decoration-none font-monospace">
+                                    </a>
+                                </td>
+                                <td>
+                                    <code th:text="${#strings.abbreviate(wua.walletPublicKeyThumbprint(), 16)}"></code>
+                                </td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${wua.status() == 'ACTIVE'} ? 'bg-success' : 'bg-danger'"
+                                          th:text="${wua.status()}">
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${wuaUtils.getWscdBadgeClass(wua.wscdType())}">
+                                        <i class="bi me-1" th:classappend="${wuaUtils.getWscdIcon(wua.wscdType())}"></i>
+                                        <span th:text="${wuaUtils.formatWscdType(wua.wscdType())}"></span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${wuaUtils.getSecurityBadgeClass(wua.wscdSecurityLevel())}"
+                                          th:text="${wuaUtils.formatSecurityLevel(wua.wscdSecurityLevel())}">
+                                    </span>
+                                </td>
+                                <td th:text="${#temporals.format(wua.issuedAt(), 'yyyy-MM-dd HH:mm')}"></td>
+                                <td th:text="${#temporals.format(wua.expiresAt(), 'yyyy-MM-dd HH:mm')}"></td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a th:href="@{/wua/{id}(id=${wua.wuaId()})}"
+                                           class="btn btn-outline-primary" title="View">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a th:if="${wua.status() == 'ACTIVE'}"
+                                           th:href="@{/wua/{id}/revoke(id=${wua.wuaId()})}"
+                                           class="btn btn-outline-danger" title="Revoke">
+                                            <i class="bi bi-x-circle"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(wuas)}">
+                                <td colspan="8" class="text-center text-muted py-5">
+                                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                    <p class="mb-0 mt-2">No WUAs found matching your criteria</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div th:if="${totalPages > 1}" class="card-footer bg-white">
+                <nav>
+                    <ul class="pagination justify-content-center mb-0">
+                        <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                            <a class="page-link"
+                               th:href="@{/wua(page=${currentPage - 1}, status=${currentStatus}, wscdType=${currentWscdType}, search=${search})}">
+                                <i class="bi bi-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                        <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}"
+                            th:classappend="${i == currentPage} ? 'active'">
+                            <a class="page-link"
+                               th:href="@{/wua(page=${i}, status=${currentStatus}, wscdType=${currentWscdType}, search=${search})}"
+                               th:text="${i + 1}"></a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage >= totalPages - 1} ? 'disabled'">
+                            <a class="page-link"
+                               th:href="@{/wua(page=${currentPage + 1}, status=${currentStatus}, wscdType=${currentWscdType}, search=${search})}">
+                                Next <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>WUA Details - WUA Admin</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a th:href="@{/wua}">WUA Management</a></li>
+                        <li class="breadcrumb-item active">Details</li>
+                    </ol>
+                </nav>
+                <h2 class="mb-0">
+                    <i class="bi bi-key me-2"></i> WUA Details
+                </h2>
+            </div>
+            <div>
+                <a th:href="@{/wua}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to List
+                </a>
+                <a th:if="${wua.status() == 'ACTIVE'}"
+                   th:href="@{/wua/{id}/revoke(id=${wua.wuaId()})}"
+                   class="btn btn-danger ms-2">
+                    <i class="bi bi-x-circle me-1"></i> Revoke
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i> WUA Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless mb-0">
+                            <tbody>
+                                <tr>
+                                    <th class="text-muted" style="width: 200px;">WUA ID</th>
+                                    <td><code th:text="${wua.wuaId()}">UUID</code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Status</th>
+                                    <td>
+                                        <span class="badge fs-6"
+                                              th:classappend="${wua.status() == 'ACTIVE'} ? 'bg-success' : 'bg-danger'"
+                                              th:text="${wua.status()}">
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Wallet Public Key Thumbprint</th>
+                                    <td><code class="text-break" th:text="${wua.walletPublicKeyThumbprint()}">Thumbprint</code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">WSCD Type</th>
+                                    <td>
+                                        <span class="badge" th:classappend="${wuaUtils.getWscdBadgeClass(wua.wscdType())}">
+                                            <i class="bi me-1" th:classappend="${wuaUtils.getWscdIcon(wua.wscdType())}"></i>
+                                            <span th:text="${wuaUtils.formatWscdType(wua.wscdType())}"></span>
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">
+                                            Raw: <code th:text="${wua.wscdType()}"></code>
+                                        </small>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Security Level</th>
+                                    <td>
+                                        <span class="badge" th:classappend="${wuaUtils.getSecurityBadgeClass(wua.wscdSecurityLevel())}"
+                                              th:text="${wuaUtils.formatSecurityLevel(wua.wscdSecurityLevel())}">
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">
+                                            Raw: <code th:text="${wua.wscdSecurityLevel()}"></code>
+                                        </small>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">ISO 18045 Level</th>
+                                    <td>
+                                        <code th:text="${wuaUtils.toIso18045Level(wua.wscdType())}"></code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Issued At</th>
+                                    <td th:text="${#temporals.format(wua.issuedAt(), 'yyyy-MM-dd HH:mm:ss')}">Date</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Expires At</th>
+                                    <td th:text="${#temporals.format(wua.expiresAt(), 'yyyy-MM-dd HH:mm:ss')}">Date</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-check me-2"></i> Status List Info
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless mb-0">
+                            <tbody>
+                                <tr>
+                                    <th class="text-muted">Status List ID</th>
+                                    <td th:text="${wua.statusListId()} ?: 'N/A'">ID</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Status List Index</th>
+                                    <td th:text="${wua.statusListIdx()} ?: 'N/A'">Index</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card mt-3" th:if="${wua.status() == 'ACTIVE'}">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-exclamation-triangle me-2"></i> Danger Zone
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Revoking this WUA will prevent the wallet from being used with credential issuers.
+                        </p>
+                        <a th:href="@{/wua/{id}/revoke(id=${wua.wuaId()})}" class="btn btn-danger w-100">
+                            <i class="bi bi-x-circle me-1"></i> Revoke This WUA
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
