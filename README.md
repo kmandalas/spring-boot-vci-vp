@@ -124,13 +124,23 @@ sequenceDiagram
     W ->> W: Parse DCQL query from verified JWT
     W ->> W: Fetch locally stored VC
     W ->> W: Prompt user for selective disclosure
-    W ->> W: Create VP with Key Binding JWT
+    alt dc+sd-jwt
+        W ->> W: Create VP with selected disclosures + Key Binding JWT
+    else mso_mdoc
+        W ->> W: Build DeviceResponse with SessionTranscript & DeviceAuth (COSE_Sign1)
+    end
     W ->> W: Encrypt response (ECDH-ES + A256GCM)
     W ->> V: POST encrypted vp_token (direct_post.jwt)
     V ->> V: Decrypt response with ephemeral private key
-    V ->> IS: Fetch issuer's public key (or use x5c from credential)
-    V ->> V: Verify SD-JWT credential signature
-    V ->> V: Verify Key Binding JWT
+    alt dc+sd-jwt
+        V ->> IS: Fetch issuer's public key (or use x5c from credential)
+        V ->> V: Verify SD-JWT credential signature
+        V ->> V: Verify Key Binding JWT
+    else mso_mdoc
+        V ->> V: Verify IssuerAuth (COSE_Sign1) + MSO digests
+        V ->> V: Verify SessionTranscript
+        V ->> V: Verify DeviceAuth signature
+    end
     V ->> IS: Check Token Status List (revocation)
     V -->> W: Return verification result
     W ->> W: Display verification outcome
