@@ -2,14 +2,10 @@ package com.example.authserver.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
-import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.*;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
@@ -125,8 +121,8 @@ public class AuthorizationConsentController {
                     "This application will be able to read your profile information."
             );
             scopeDescriptions.put(
-                    "eu.europa.ec.eudi.pda1_sd_jwt_vc",
-                    "Issue a Portable Document A1 (PDA1) credential - Social security coordination document for cross-border workers. Claims: Credential Holder, Nationality, Competent Institution."
+                    "eu.europa.ec.eudi.pda1.1",
+                    "Issue a Portable Document A1 (PDA1) credential - Social security coordination document for cross-border workers. Claims: Credential Holder & Competent Institution."
             );
         }
 

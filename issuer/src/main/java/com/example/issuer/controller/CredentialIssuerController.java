@@ -1,5 +1,6 @@
 package com.example.issuer.controller;
 
+import com.example.issuer.model.CredentialFormat;
 import com.example.issuer.model.CredentialRequest;
 import com.example.issuer.service.CredentialIssuerService;
 import com.nimbusds.jose.jwk.JWK;
@@ -33,7 +34,7 @@ public class CredentialIssuerController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SCOPE_eu.europa.ec.eudi.pda1_sd_jwt_vc')")
+    @PreAuthorize("hasAuthority('SCOPE_eu.europa.ec.eudi.pda1.1')")
     public ResponseEntity<Map<String, Object>> issueCredential(@RequestBody CredentialRequest request,
                                                                Authentication authentication) throws Exception {
 
@@ -50,16 +51,16 @@ public class CredentialIssuerController {
         // Extract username
         String username = authentication.getName();
 
-        // Generate SD-JWT VC using the wallet's JWK
-        String sdJwt = credentialIssuerService.generateSdJwt(walletKey, username);
+        // Determine format (defaults to dc+sd-jwt)
+        CredentialFormat format = CredentialFormat.fromValue(request.format());
 
-        // Prepare response according to the spec
-        Map<String, Object> response = Map.of(
-                "format", "dc+sd-jwt",
-                "credential", sdJwt
-        );
+        // Issue credential and build response
+        String credential = credentialIssuerService.issueCredential(format, walletKey, username);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(Map.of(
+                "format", format.value(),
+                "credential", credential
+        ));
     }
 
 }

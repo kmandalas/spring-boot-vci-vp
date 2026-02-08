@@ -1,12 +1,15 @@
 package com.example.issuer.service;
 
-import com.authlete.sd.SDJWT;
+import com.authlete.cose.COSEException;
 import com.example.issuer.config.AppMetadataConfig;
 import com.example.issuer.config.WalletProviderConfig;
+import com.example.issuer.model.CredentialFormat;
 import com.example.issuer.model.CredentialRequest;
 import com.example.issuer.model.CredentialStatusEntry;
 import com.example.issuer.model.StatusList;
 import com.example.issuer.repository.CredentialStatusRepository;
+import com.example.issuer.service.credential.MDocIssuerService;
+import com.example.issuer.service.credential.SdJwtIssuerService;
 import com.example.issuer.util.JwtSignatureUtils;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -20,9 +23,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.security.cert.CertificateException;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -40,24 +45,28 @@ public class CredentialIssuerService {
 
     private final Set<String> usedNonces = ConcurrentHashMap.newKeySet();
 
-    private final AuthleteHelper authleteHelper;
     private final AppMetadataConfig appMetadataConfig;
     private final WalletProviderConfig walletProviderConfig;
     private final StatusListValidationService statusListValidationService;
     private final StatusListIndexService statusListIndexService;
     private final CredentialStatusRepository credentialStatusRepository;
+    private final SdJwtIssuerService sdJwtIssuerService;
+    private final MDocIssuerService mDocIssuerService;
 
-    public CredentialIssuerService(AuthleteHelper authleteHelper, AppMetadataConfig appMetadataConfig,
+    public CredentialIssuerService(AppMetadataConfig appMetadataConfig,
                                    WalletProviderConfig walletProviderConfig,
                                    StatusListValidationService statusListValidationService,
                                    StatusListIndexService statusListIndexService,
-                                   CredentialStatusRepository credentialStatusRepository) {
-        this.authleteHelper = authleteHelper;
+                                   CredentialStatusRepository credentialStatusRepository,
+                                   SdJwtIssuerService sdJwtIssuerService,
+                                   MDocIssuerService mDocIssuerService) {
         this.appMetadataConfig = appMetadataConfig;
         this.walletProviderConfig = walletProviderConfig;
         this.statusListValidationService = statusListValidationService;
         this.statusListIndexService = statusListIndexService;
         this.credentialStatusRepository = credentialStatusRepository;
+        this.sdJwtIssuerService = sdJwtIssuerService;
+        this.mDocIssuerService = mDocIssuerService;
     }
 
     /**
@@ -425,9 +434,33 @@ public class CredentialIssuerService {
     }
 
     /**
+     * Issues a credential in the specified format.
+     *
+     * @param format         the credential format
+     * @param walletKey      the wallet's public key for key binding
+     * @param userIdentifier the authenticated user's identifier
+     * @return credential string (SD-JWT compact serialization or base64url-encoded mDoc CBOR)
+     */
+    public String issueCredential(CredentialFormat format, JWK walletKey, String userIdentifier)
+            throws JOSEException, ParseException, COSEException, CertificateException {
+
+        if (walletKey == null) {
+            throw new IllegalArgumentException("Wallet key is required for credential issuance.");
+        }
+
+        return switch (format) {
+            case MSO_MDOC -> {
+                byte[] mDocBytes = generateMDoc(walletKey, userIdentifier);
+                yield Base64.getUrlEncoder().withoutPadding().encodeToString(mDocBytes);
+            }
+            case DC_SD_JWT -> generateSdJwt(walletKey, userIdentifier);
+        };
+    }
+
+    /**
      * Generates an SD-JWT Verifiable Credential bound to the wallet's public key.
      *
-     * @param walletKey the wallet's public key for key binding
+     * @param walletKey      the wallet's public key for key binding
      * @param userIdentifier the authenticated user's identifier
      * @return serialized SD-JWT credential
      */
@@ -443,7 +476,7 @@ public class CredentialIssuerService {
         String statusListUri = appMetadataConfig.getEndpoints().getStatusList() + "/" + statusList.id();
 
         // Step 3: Create SD-JWT Verifiable Credential with status claim
-        SDJWT sdJwt = authleteHelper.createVC(walletKey.toPublicJWK(), userIdentifier, statusIndex, statusListUri);
+        String sdJwt = sdJwtIssuerService.generateSdJwt(walletKey.toPublicJWK(), userIdentifier, statusIndex, statusListUri).toString();
 
         // Step 4: Persist credential status entry
         String credentialId = UUID.randomUUID().toString();
@@ -452,11 +485,34 @@ public class CredentialIssuerService {
         );
         credentialStatusRepository.save(entry);
 
-        logger.info("Issued credential {} with status list index {} in list {}",
+        logger.info("Issued SD-JWT credential {} with status list index {} in list {}",
                 credentialId, statusIndex, statusList.id());
 
         // Step 5: Return serialized SD-JWT
-        return sdJwt.toString();
+        return sdJwt;
+    }
+
+    /**
+     * Generates an mDoc Verifiable Credential bound to the wallet's public key.
+     * Note: mDoc credentials do not currently support Token Status Lists.
+     *
+     * @param walletKey      the wallet's public key for key binding
+     * @param userIdentifier the authenticated user's identifier
+     * @return CBOR-encoded mDoc bytes
+     */
+    public byte[] generateMDoc(JWK walletKey, String userIdentifier)
+            throws JOSEException, COSEException, CertificateException {
+
+        if (walletKey == null) {
+            throw new IllegalArgumentException("Wallet key is required for mDoc issuance.");
+        }
+
+        byte[] mDocBytes = mDocIssuerService.generateMDoc(walletKey.toPublicJWK(), userIdentifier);
+
+        logger.info("Issued mDoc credential for user {}", userIdentifier);
+
+        return mDocBytes;
     }
 
 }
+

@@ -1,49 +1,65 @@
-package com.example.issuer.service;
+package com.example.issuer.service.credential;
 
 import com.authlete.sd.Disclosure;
 import com.authlete.sd.SDJWT;
 import com.authlete.sd.SDObjectBuilder;
 import com.authlete.sd.SDObjectEncoder;
 import com.example.issuer.config.AppMetadataConfig;
+import com.example.issuer.model.CredentialFormat;
+import com.example.issuer.service.AuthSourceHelper;
+import com.example.issuer.service.IssuerSigningService;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.util.Base64;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Component
-public class AuthleteHelper {
+/**
+ * Service for generating SD-JWT Verifiable Credentials.
+ * Handles SD-JWT creation with two-level recursive selective disclosure.
+ */
+@Service
+public class SdJwtIssuerService {
 
     private final AppMetadataConfig appMetadataConfig;
     private final AuthSourceHelper authSourceHelper;
     private final IssuerSigningService issuerSigningService;
 
-    public AuthleteHelper(AppMetadataConfig appMetadataConfig, AuthSourceHelper authSourceHelper,
-                          IssuerSigningService issuerSigningService) {
+    public SdJwtIssuerService(AppMetadataConfig appMetadataConfig, AuthSourceHelper authSourceHelper,
+                              IssuerSigningService issuerSigningService) {
         this.appMetadataConfig = appMetadataConfig;
         this.authSourceHelper = authSourceHelper;
         this.issuerSigningService = issuerSigningService;
     }
 
     /**
-     * Creates a Verifiable Credential in SD-JWT format with two-level recursive selective disclosure.
+     * Generates an SD-JWT Verifiable Credential with two-level recursive selective disclosure.
      *
      * Structure (EU Reference Demo Style):
      * - Parent objects (credential_holder, competent_institution) are themselves disclosures
      * - Each nested field within parents is also a separate disclosure
      * - Total: 8 disclosures (2 parent + 6 nested)
+     *
+     * @param walletKey       the wallet's public key for key binding
+     * @param userIdentifier  the authenticated user's identifier
+     * @param statusIndex     the status list index for revocation support
+     * @param statusListUri   the status list URI for revocation support
+     * @return serialized SD-JWT credential
      */
-    public SDJWT createVC(JWK walletKey, String userIdentifier, int statusIndex, String statusListUri) throws JOSEException, ParseException {
+    public SDJWT generateSdJwt(JWK walletKey, String userIdentifier, int statusIndex, String statusListUri)
+            throws JOSEException, ParseException {
+
         JWK signingKey = issuerSigningService.getSigningKey();
         List<Base64> x5cChain = issuerSigningService.getX5cChain();
 
@@ -56,7 +72,7 @@ public class AuthleteHelper {
         SDObjectEncoder credHolderEncoder = new SDObjectEncoder();
         credHolderEncoder.setDecoyMagnification(0.0, 0.0);
         Map<String, Object> encodedCredentialHolder =
-            new LinkedHashMap<>(credHolderEncoder.encode(authSourceHelper.getCredentialHolder(userIdentifier)));
+                new LinkedHashMap<>(credHolderEncoder.encode(authSourceHelper.getCredentialHolder(userIdentifier)));
         encodedCredentialHolder.remove("_sd_alg");  // Remove from nested object
         allDisclosures.addAll(credHolderEncoder.getDisclosures());  // family_name, given_name, birth_date
 
@@ -64,7 +80,7 @@ public class AuthleteHelper {
         SDObjectEncoder institutionEncoder = new SDObjectEncoder();
         institutionEncoder.setDecoyMagnification(0.0, 0.0);
         Map<String, Object> encodedInstitution =
-            new LinkedHashMap<>(institutionEncoder.encode(authSourceHelper.getCompetentInstitution(userIdentifier)));
+                new LinkedHashMap<>(institutionEncoder.encode(authSourceHelper.getCompetentInstitution(userIdentifier)));
         encodedInstitution.remove("_sd_alg");  // Remove from nested object
         allDisclosures.addAll(institutionEncoder.getDisclosures());  // country_code, institution_id, institution_name
 
@@ -141,7 +157,7 @@ public class AuthleteHelper {
         // Note: Don't include 'kid' when x5c is present (EU Reference style)
         // The certificate chain identifies the key
         return new JWSHeader.Builder(alg)
-                .type(new JOSEObjectType("dc+sd-jwt"))
+                .type(new JOSEObjectType(CredentialFormat.DC_SD_JWT.value()))
                 .x509CertChain(x5cChain)
                 .build();
     }
@@ -179,7 +195,7 @@ public class AuthleteHelper {
                 }
 
                 // Sort the array (SD-JWT spec recommends sorting for privacy)
-                java.util.Collections.sort(sdList);
+                Collections.sort(sdList);
                 payload.put("_sd", sdList);
             }
         } catch (Exception e) {

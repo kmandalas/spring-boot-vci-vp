@@ -1,45 +1,44 @@
 package com.example.verifier.service;
 
-import com.authlete.sd.Disclosure;
-import com.authlete.sd.SDJWT;
-import com.authlete.sd.SDObjectDecoder;
 import com.example.verifier.config.AppConfig;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
+import com.example.verifier.model.CredentialFormat;
+import com.example.verifier.model.PresentationRequest;
+import com.example.verifier.service.credential.MDocVerificationContext;
+import com.example.verifier.service.credential.MDocVerifierService;
+import com.example.verifier.service.credential.SdJwtVerifierService;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.jwt.JWTClaimsSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.ECPublicKey;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Orchestration service for VP (Verifiable Presentation) validation.
+ * Detects credential format and delegates to format-specific verifier services.
+ */
 @Service
 public class VpValidationService {
 
     private static final Logger logger = LoggerFactory.getLogger(VpValidationService.class);
 
     private final AppConfig appConfig;
-    private final AuthleteHelper authleteHelper;
-    private final ObjectMapper objectMapper;
     private final StatusListTokenValidator statusListTokenValidator;
+    private final SdJwtVerifierService sdJwtVerifierService;
+    private final MDocVerifierService mDocVerifierService;
 
-    public VpValidationService(AppConfig appConfig, AuthleteHelper authleteHelper,
-                               ObjectMapper objectMapper, StatusListTokenValidator statusListTokenValidator) {
+    public VpValidationService(AppConfig appConfig,
+                               StatusListTokenValidator statusListTokenValidator,
+                               SdJwtVerifierService sdJwtVerifierService,
+                               MDocVerifierService mDocVerifierService) {
         this.appConfig = appConfig;
-        this.authleteHelper = authleteHelper;
-        this.objectMapper = objectMapper;
         this.statusListTokenValidator = statusListTokenValidator;
+        this.sdJwtVerifierService = sdJwtVerifierService;
+        this.mDocVerifierService = mDocVerifierService;
     }
 
     /**
@@ -56,179 +55,154 @@ public class VpValidationService {
     }
 
     /**
-     * Validates a VP token and extracts disclosed claims.
+     * Validates a VP token and extracts disclosed claims with format validation and DeviceAuth.
+     * Uses expected format from DCQL query if provided, otherwise auto-detects.
+     * Creates MDocVerificationContext only when format is mDoc.
      *
-     * @param vpToken the SD-JWT VP token
+     * @param vpToken the VP token (SD-JWT or base64url-encoded mDoc)
+     * @param request PresentationRequest containing expected format and DeviceAuth parameters (may be null)
      * @return ValidationResult with status and claims
      */
-    public ValidationResult validateAndExtract(String vpToken) {
+    public ValidationResult validateAndExtract(String vpToken, PresentationRequest request) {
+        CredentialFormat expectedFormat = request != null ? request.expectedFormat() : null;
+
+        // Determine format: use expected format if provided, otherwise auto-detect
+        boolean isMDoc;
+        if (expectedFormat != null) {
+            isMDoc = expectedFormat == CredentialFormat.MSO_MDOC;
+            logger.debug("Using expected format from DCQL: {}", expectedFormat.value());
+
+            // Validate that token structure matches expected format
+            boolean tokenLooksMDoc = isMDocFormat(vpToken);
+            if (isMDoc != tokenLooksMDoc) {
+                return ValidationResult.failure(
+                        "Format mismatch: expected " + expectedFormat.value() +
+                                " but token " + (tokenLooksMDoc ? "appears to be mDoc" : "appears to be SD-JWT"));
+            }
+        } else {
+            // Fallback to auto-detection
+            isMDoc = isMDocFormat(vpToken);
+            logger.debug("Auto-detected format: {}", isMDoc ? CredentialFormat.MSO_MDOC.value() : CredentialFormat.DC_SD_JWT.value());
+        }
+
+        if (isMDoc) {
+            // Create MDocVerificationContext only for mDoc format
+            MDocVerificationContext context = null;
+            if (request != null) {
+                context = new MDocVerificationContext(
+                        request.clientId(),
+                        request.responseUri(),
+                        request.nonce(),
+                        request.ephemeralKeyThumbprint()
+                );
+            }
+            return validateMDoc(vpToken, context);
+        } else {
+            return validateSdJwt(vpToken);
+        }
+    }
+
+    /**
+     * Validates an SD-JWT VP token.
+     */
+    private ValidationResult validateSdJwt(String vpToken) {
         try {
-            // Step 1: Parse the VP Token
-            SDJWT vp = SDJWT.parse(vpToken);
-
-            // Step 2: Parse credential JWT to extract issuer
-            SignedJWT credentialJwt = SignedJWT.parse(vp.getCredentialJwt());
-
-            // Step 3: Validate issuer against local "trusted list"
-            String issuer = credentialJwt.getJWTClaimsSet().getIssuer();
+            // Step 1: Extract issuer and validate against trusted list
+            String issuer = sdJwtVerifierService.extractIssuer(vpToken);
             if (!appConfig.isTrustedIssuer(issuer)) {
-                logger.warn("⚠️Untrusted credential issuer: {}", issuer);
+                logger.warn("Untrusted credential issuer: {}", issuer);
                 return ValidationResult.failure("Untrusted credential issuer: " + issuer);
             }
             logger.info("Credential issuer '{}' is trusted", issuer);
 
-            // Step 4: Fetch issuer's public key from JWKS endpoint (key pinning)
+            // Step 2: Fetch issuer's public key from JWKS endpoint
             String jwksUrl = issuer + "/.well-known/jwks.json";
             logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
             JWKSet issuerJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
             JWK jwksKey = issuerJwkSet.getKeys().getFirst();
             logger.info("Loaded issuer public key from JWKS");
 
-            // Step 5: Extract public key from x5c and cross-check with JWKS
-            JWK x5cKey = extractKeyFromX5c(credentialJwt);
-            if (x5cKey == null) {
-                return ValidationResult.failure("Failed to extract key from x5c header");
-            }
-            if (!keysMatch(jwksKey, x5cKey)) {
-                logger.warn("⚠️x5c key does not match JWKS key - possible tampering");
-                return ValidationResult.failure("x5c key does not match issuer JWKS");
-            }
-            logger.info("x5c key matches JWKS key - cross-check passed");
+            // Step 3: Verify SD-JWT (signature + binding JWT + claim extraction)
+            SdJwtVerifierService.SdJwtValidationResult result =
+                    sdJwtVerifierService.verifySdJwtPresentation(vpToken, jwksKey);
 
-            // Step 6: Verify VP (credential signature + key binding JWT)
-            authleteHelper.verifyVP(vp, jwksKey);
-            logger.info("VP signature verification successful");
+            if (!result.valid()) {
+                return ValidationResult.failure(result.error());
+            }
+            logger.info("SD-JWT VP signature verification successful");
 
-            // Step 7: Check credential revocation status (Token Status List)
+            // Step 4: Check credential revocation status (Token Status List)
             if (appConfig.isStatusCheckEnabled()) {
+                JWTClaimsSet credentialClaims = sdJwtVerifierService.getCredentialClaims(vpToken);
                 StatusListTokenValidator.StatusCheckResult statusResult =
-                        statusListTokenValidator.checkStatus(credentialJwt.getJWTClaimsSet());
+                        statusListTokenValidator.checkStatus(credentialClaims);
                 switch (statusResult) {
-                    case StatusListTokenValidator.StatusCheckResult.Revoked() ->
-                        { return ValidationResult.failure("Credential has been revoked"); }
-                    case StatusListTokenValidator.StatusCheckResult.Error(String msg) ->
-                        { return ValidationResult.failure("Status check failed: " + msg); }
+                    case StatusListTokenValidator.StatusCheckResult.Revoked() -> {
+                        return ValidationResult.failure("Credential has been revoked");
+                    }
+                    case StatusListTokenValidator.StatusCheckResult.Error(String msg) -> {
+                        return ValidationResult.failure("Status check failed: " + msg);
+                    }
                     case StatusListTokenValidator.StatusCheckResult.Valid() ->
-                        logger.info("✅ Credential status check passed");
+                            logger.info("Credential status check passed");
                     case StatusListTokenValidator.StatusCheckResult.Skipped() ->
-                        logger.debug("⏭️ No status claim in credential - skipping status check");
+                            logger.debug("No status claim in credential - skipping status check");
                 }
             }
 
-            // Step 8: Extract disclosed claims
-            Map<String, Object> claims = extractDisclosedClaims(vpToken);
-
-            return ValidationResult.success(issuer, claims);
+            return ValidationResult.success(issuer, result.disclosedClaims());
 
         } catch (Exception e) {
-            logger.error("❌VP validation failed", e);
+            logger.error("SD-JWT VP validation failed", e);
             return ValidationResult.failure(e.getMessage());
         }
     }
 
     /**
-     * Extracts the issuer's public key from the x5c certificate chain in the JWT header.
+     * Validates an mDoc VP token with optional DeviceAuth verification.
+     *
+     * @param vpToken the base64url-encoded mDoc DeviceResponse
+     * @param context DeviceAuth context (null to skip DeviceAuth verification)
      */
-    private JWK extractKeyFromX5c(SignedJWT credentialJwt) {
+    private ValidationResult validateMDoc(String vpToken, MDocVerificationContext context) {
         try {
-            List<com.nimbusds.jose.util.Base64> x5cChain = credentialJwt.getHeader().getX509CertChain();
-            if (x5cChain == null || x5cChain.isEmpty()) {
-                logger.error("❌No x5c certificate chain in credential JWT header");
-                return null;
+            // For mDoc validation, we need the issuer's public key
+            // Currently using the first trusted issuer's JWKS
+            // In production, you would determine the issuer from the mDoc's x5chain
+            if (appConfig.getTrustedIssuers().isEmpty()) {
+                return ValidationResult.failure("No trusted issuers configured for mDoc validation");
             }
 
-            // Parse leaf certificate (first in chain)
-            byte[] certBytes = x5cChain.getFirst().decode();
-            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-            X509Certificate certificate = (X509Certificate) certFactory.generateCertificate(
-                    new ByteArrayInputStream(certBytes));
+            String issuer = appConfig.getTrustedIssuers().getFirst();
+            String jwksUrl = issuer + "/.well-known/jwks.json";
+            logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
 
-            // Extract EC public key and build JWK
-            ECPublicKey ecPublicKey = (ECPublicKey) certificate.getPublicKey();
-            logger.debug("Extracted issuer public key from x5c header");
+            JWKSet issuerJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
+            JWK jwksKey = issuerJwkSet.getKeys().getFirst();
 
-            return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
+            // Validate mDoc with DeviceAuth context
+            MDocVerifierService.MDocValidationResult mDocResult =
+                    mDocVerifierService.verifyMDocPresentation(vpToken, jwksKey, context);
+
+            if (mDocResult.valid()) {
+                logger.info("mDoc VP verified - issuer='{}'", issuer);
+                return ValidationResult.success(issuer, mDocResult.disclosedClaims());
+            } else {
+                return ValidationResult.failure("mDoc validation failed: " + mDocResult.error());
+            }
 
         } catch (Exception e) {
-            logger.error("❌Failed to extract key from x5c", e);
-            return null;
+            logger.error("mDoc VP validation failed", e);
+            return ValidationResult.failure(e.getMessage());
         }
     }
 
     /**
-     * Compares two JWKs by their public key thumbprint.
+     * Detects if the VP token is in mDoc format.
+     * mDoc is base64url-encoded CBOR (no dots), while SD-JWT has dots.
      */
-    private boolean keysMatch(JWK jwksKey, JWK x5cKey) {
-        try {
-            String jwksThumbprint = jwksKey.computeThumbprint().toString();
-            String x5cThumbprint = x5cKey.computeThumbprint().toString();
-            return jwksThumbprint.equals(x5cThumbprint);
-        } catch (Exception e) {
-            logger.error("❌Failed to compute key thumbprints", e);
-            return false;
-        }
-    }
-
-    /**
-     * Extracts disclosed claims from an SD-JWT VP token using SDObjectDecoder.
-     * Handles two-level selective disclosure by re-decoding nested maps whose
-     * _sd arrays were not resolved during the first pass (the Authlete decoder
-     * does not recurse into claim values revealed by disclosures).
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> extractDisclosedClaims(String sdJwt) {
-        try {
-            // Parse the SD-JWT to get credential JWT and disclosures
-            SDJWT vp = SDJWT.parse(sdJwt);
-
-            // Parse credential JWT payload to get the encoded structure with _sd arrays
-            String[] jwtParts = vp.getCredentialJwt().split("\\.");
-            String payloadJson = new String(Base64.getUrlDecoder().decode(jwtParts[1]));
-            Map<String, Object> payload = objectMapper.readValue(payloadJson, new TypeReference<>() {});
-
-            // Get the list of disclosures from the VP
-            List<Disclosure> disclosures = vp.getDisclosures();
-
-            // First pass: decode top-level _sd entries
-            SDObjectDecoder decoder = new SDObjectDecoder();
-            Map<String, Object> decoded = decoder.decode(payload, disclosures);
-
-            // Second pass: the Authlete decoder does not recurse into values
-            // revealed by disclosures, so nested maps may still contain _sd arrays.
-            // Re-decode any nested map that still has an _sd key.
-            for (Map.Entry<String, Object> entry : decoded.entrySet()) {
-                if (entry.getValue() instanceof Map) {
-                    Map<String, Object> nested = (Map<String, Object>) entry.getValue();
-                    if (nested.containsKey("_sd")) {
-                        entry.setValue(decoder.decode(nested, disclosures));
-                    }
-                }
-            }
-
-            // Clean up _sd artifacts from all levels
-            cleanSdArtifacts(decoded);
-
-            logger.info("Extracted claims: {}", decoded.keySet());
-            return decoded;
-
-        } catch (Exception e) {
-            logger.error("Error extracting disclosed claims", e);
-            return Map.of();
-        }
-    }
-
-    /**
-     * Recursively removes _sd and _sd_alg artifacts from decoded claims.
-     */
-    @SuppressWarnings("unchecked")
-    private void cleanSdArtifacts(Map<String, Object> map) {
-        map.remove("_sd");
-        map.remove("_sd_alg");
-        for (Object value : map.values()) {
-            if (value instanceof Map) {
-                cleanSdArtifacts((Map<String, Object>) value);
-            }
-        }
+    private boolean isMDocFormat(String vpToken) {
+        return vpToken != null && !vpToken.contains(".");
     }
 
     /**

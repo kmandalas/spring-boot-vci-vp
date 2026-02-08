@@ -1,5 +1,6 @@
 package com.example.verifier.service;
 
+import com.example.verifier.model.CredentialFormat;
 import com.example.verifier.model.PresentationRequest;
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
@@ -83,8 +84,22 @@ public class PresentationRequestService {
         // Sign the authorization request as JWT (JAR with x5c header)
         String signedJwt = jarSigningService.signAuthorizationRequest(authorizationRequest);
 
-        // Store signed JWT with encryption key
-        requestStore.put(requestId, new PresentationRequest(signedJwt, encryptionKey));
+        // Compute JWK thumbprint of ephemeral encryption key for mDoc DeviceAuth
+        String ephemeralKeyThumbprint = encryptionKey.computeThumbprint().toString();
+
+        // Extract expected format from DCQL query
+        CredentialFormat expectedFormat = extractExpectedFormat(dcqlQuery);
+
+        // Store signed JWT with encryption key and context parameters for DeviceAuth verification
+        requestStore.put(requestId, new PresentationRequest(
+                signedJwt,
+                encryptionKey,
+                getClientId(),
+                responseUri,
+                nonce,
+                ephemeralKeyThumbprint,
+                expectedFormat
+        ));
     }
 
     /**
@@ -142,6 +157,39 @@ public class PresentationRequestService {
      */
     public boolean hasRequest(String requestId) {
         return requestStore.containsKey(requestId);
+    }
+
+    /**
+     * Gets the presentation request for a given request ID.
+     * Used for retrieving DeviceAuth context parameters.
+     */
+    public PresentationRequest getRequest(String requestId) {
+        return requestStore.get(requestId);
+    }
+
+    /**
+     * Extracts the expected credential format from the DCQL query.
+     * Looks for the first credential's format field.
+     *
+     * @param dcqlQuery The DCQL query map
+     * @return The matching CredentialFormat, or null if not found/recognized
+     */
+    private CredentialFormat extractExpectedFormat(Map<String, Object> dcqlQuery) {
+        try {
+            Object credentialsObj = dcqlQuery.get("credentials");
+            if (credentialsObj instanceof List<?> credentials && !credentials.isEmpty()) {
+                Object firstCredential = credentials.getFirst();
+                if (firstCredential instanceof Map<?, ?> credentialMap) {
+                    Object format = credentialMap.get("format");
+                    if (format instanceof String formatStr) {
+                        return CredentialFormat.fromValue(formatStr);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to auto-detection if parsing fails
+        }
+        return null;
     }
 
 }

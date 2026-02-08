@@ -85,7 +85,7 @@ public class AuthorizationServerConfig {
                     .providerConfigurationEndpoint(providerConfigurationEndpoint ->
                         providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration ->
                             providerConfiguration.scopes(scopes -> {
-                                scopes.add("eu.europa.ec.eudi.pda1_sd_jwt_vc");
+                                scopes.add("eu.europa.ec.eudi.pda1.1");
                             })
                         )
                     )
@@ -105,7 +105,7 @@ public class AuthorizationServerConfig {
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-            .formLogin(withDefaults());
+            .formLogin(form -> form.loginPage("/login").permitAll());
 
         return http.build();
     }
@@ -126,7 +126,7 @@ public class AuthorizationServerConfig {
                 .clientAuthenticationMethod(WalletAttestationAuthenticationToken.ATTEST_JWT_CLIENT_AUTH)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUris(uris -> uris.addAll(redirectUris))
-                .scope("eu.europa.ec.eudi.pda1_sd_jwt_vc")
+                .scope("eu.europa.ec.eudi.pda1.1")
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(15))

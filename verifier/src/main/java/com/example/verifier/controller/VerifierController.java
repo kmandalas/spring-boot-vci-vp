@@ -1,6 +1,8 @@
 package com.example.verifier.controller;
 
 import com.example.verifier.config.AppConfig;
+import com.example.verifier.model.CredentialFormat;
+import com.example.verifier.model.PresentationRequest;
 import com.example.verifier.service.PresentationRequestService;
 import com.example.verifier.service.VpValidationService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -65,7 +67,7 @@ public class VerifierController {
                     "credentials", List.of(
                             Map.of(
                                     "id", "pda1_credential",
-                                    "format", "dc+sd-jwt",
+                                    "format", CredentialFormat.DC_SD_JWT.value(),
                                     "meta", Map.of(
                                             "vct_values", List.of("urn:eu.europa.ec.eudi:pda1:1")
                                     ),
@@ -148,12 +150,151 @@ public class VerifierController {
                             color: #666;
                             margin-top: 10px;
                         }
+                        .format-badge {
+                            background-color: #28a745;
+                            color: white;
+                            padding: 5px 10px;
+                            border-radius: 3px;
+                            font-size: 12px;
+                        }
                     </style>
                 </head>
                 <body>
-                    <h2>Cognity VCI-VP demo</h2>
+                    <h2>Cognity VCI-VP demo <span class="format-badge">SD-JWT</span></h2>
                     <p>Scan the QR code below with your phone</p>
                     <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
+                    <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (sd-jwt)</p>
+                    <div id="qrcode"></div>
+                    <p>- OR -</p>
+                    <a href="%s" class="wallet-link haip">HAIP WALLET</a>
+                    <a href="%s" class="wallet-link">OpenID4VP WALLET</a>
+                    <script>
+                        const deepLink = "%s";
+                        new QRCode(document.getElementById("qrcode"), {
+                            text: deepLink,
+                            width: 256,
+                            height: 256,
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
+                    </script>
+                </body>
+                </html>
+                """.formatted(haipDeepLink, openid4vpDeepLink, haipDeepLink));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error generating wallet page: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Generates an HTML page for mDoc credential presentation.
+     * Similar to invoke-wallet but uses mDoc DCQL format.
+     */
+    @GetMapping("/invoke-wallet-mdoc")
+    public ResponseEntity<String> invokeWalletPageMDoc() {
+        try {
+            // DCQL query for mDoc PDA1 credential
+            Map<String, Object> dcqlQuery = Map.of(
+                    "credentials", List.of(
+                            Map.of(
+                                    "id", "pda1_mdoc",
+                                    "format", CredentialFormat.MSO_MDOC.value(),
+                                    "meta", Map.of(
+                                            "doctype_value", "eu.europa.ec.eudi.pda1.1"
+                                    ),
+                                    "claims", List.of(
+                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "credential_holder"), "intent_to_retain", false),
+                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "competent_institution"), "intent_to_retain", false)
+                                    )
+                            )
+                    )
+            );
+
+            // Base client metadata (encryption params added by service)
+            Map<String, Object> clientMetadata = Map.of(
+                    "client_name", "Demo Verifier Inc.",
+                    "logo_uri", "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120",
+                    "purpose", "Verify your Portable Document A1 (mDoc) credentials"
+            );
+
+            // Generate requestId upfront so we can include it in response_uri
+            String requestId = UUID.randomUUID().toString();
+            String responseUriWithId = appConfig.getResponseUri() + "/" + requestId;
+
+            // Create presentation request (generates ephemeral encryption key + signs as JAR)
+            presentationRequestService.createPresentationRequest(
+                    requestId,
+                    responseUriWithId,
+                    dcqlQuery,
+                    clientMetadata
+            );
+
+            // Build request URI for wallet to fetch signed authorization request
+            String requestUri = appConfig.getRequestUriStore() + requestId;
+
+            // Get x509_hash client_id from the signing service
+            String clientId = presentationRequestService.getClientId();
+
+            // Generate deep links for both schemes (HAIP and OpenID4VP)
+            String queryParams = "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                    + "&request_uri=" + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
+            String haipDeepLink = "haip-vp://" + queryParams;
+            String openid4vpDeepLink = "openid4vp://" + queryParams;
+
+            // Return an HTML page with QR code (HAIP) & both deep link buttons
+            return ResponseEntity.ok("""
+                <html>
+                <head>
+                    <title>Demo Verifier Inc. VCI-VP demo (mDoc)</title>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+                    <style>
+                        body {
+                            text-align: center;
+                            font-family: Arial, sans-serif;
+                        }
+                        #qrcode {
+                            display: flex;
+                            justify-content: center;
+                            margin: 20px auto;
+                        }
+                        .wallet-link {
+                            display: inline-block;
+                            padding: 10px 20px;
+                            margin: 5px;
+                            background-color: #007bff;
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            font-size: 16px;
+                        }
+                        .wallet-link:hover {
+                            background-color: #0056b3;
+                        }
+                        .wallet-link.haip {
+                            background-color: #28a745;
+                        }
+                        .wallet-link.haip:hover {
+                            background-color: #1e7e34;
+                        }
+                        .scheme-label {
+                            font-size: 12px;
+                            color: #666;
+                            margin-top: 10px;
+                        }
+                        .format-badge {
+                            background-color: #6f42c1;
+                            color: white;
+                            padding: 5px 10px;
+                            border-radius: 3px;
+                            font-size: 12px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>Cognity VCI-VP demo <span class="format-badge">mDoc</span></h2>
+                    <p>Scan the QR code below with your phone</p>
+                    <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
+                    <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (mso_mdoc)</p>
                     <div id="qrcode"></div>
                     <p>- OR -</p>
                     <a href="%s" class="wallet-link haip">HAIP WALLET</a>
@@ -220,8 +361,11 @@ public class VerifierController {
                 return ResponseEntity.badRequest().body("❌ No vp_token in decrypted response.");
             }
 
-            // Validate VP and extract claims
-            VpValidationService.ValidationResult result = vpValidationService.validateAndExtract(vpToken);
+            // Get stored request for format validation and mDoc DeviceAuth context
+            PresentationRequest request = presentationRequestService.getRequest(requestId);
+
+            // Validate VP and extract claims (request provides expected format + DeviceAuth context for mDoc)
+            VpValidationService.ValidationResult result = vpValidationService.validateAndExtract(vpToken, request);
 
             // Cleanup the request after processing
             presentationRequestService.removeRequest(requestId);
