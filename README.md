@@ -1,5 +1,5 @@
-# Spring Boot SD-JWT & VCI/VP Demo
-Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
+# Spring Boot SD-JWT, mDoc & VCI/VP Demo
+Explore how SD-JWTs, mDoc (ISO 18013-5), OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
 
 Related articles:
 - [Verifiable Credentials with Spring Boot & Android](https://dzone.com/articles/verifiable-credentials-spring-boot-android)
@@ -14,7 +14,7 @@ The system consists of four independent Spring Boot applications:
 | Module | Port | Description |
 |--------|------|-------------|
 | **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
-| **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT credentials with revocation support (publishes own Token Status List) |
+| **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT and mDoc credentials with revocation support (publishes own Token Status List) |
 | **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, encrypted responses, and Token Status List revocation check |
 | **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
 
@@ -56,8 +56,8 @@ sequenceDiagram
     Issuer->>AuthenticSource: Retrieve user credentials
     AuthenticSource-->>Issuer: Return credentials
     Issuer->>Issuer: Allocate Token Status List index
-    Issuer->>Issuer: Prepare SD-JWT with x5c header and status claim
-    Issuer-->>WalletApp: Return SD-JWT (dc+sd-jwt format)
+    Issuer->>Issuer: Prepare SD-JWT or mDoc credential
+    Issuer-->>WalletApp: Return credential (dc+sd-jwt or mso_mdoc format)
     WalletApp->>WalletApp: Verify SD-JWT signature using x5c certificate
     WalletApp->>WalletApp: Decode & Display verifiable credentials
     WalletApp->>WalletApp: Save credentials in Encrypted Shared Preferences
@@ -86,6 +86,10 @@ eyJ4NWMiOlsiTUlJQmtUQ0NBVGVnQXdJQkFnSVVkeVljbDE5ZFlCSjhtY1hHc2NqVXN4c2k2RGt3Q2dZ
 💡 Paste it on https://www.sdjwt.co for inspection.
 
 ![sdjwt.png](sdjwt.png)
+
+#### mDoc (mso_mdoc)
+
+Credentials can also be issued in `mso_mdoc` format (ISO 18013-5). The mDoc credential is a CBOR-encoded structure containing the Mobile Security Object (MSO) with issuer-signed data elements and digest-based integrity protection. The response is base64url-encoded CBOR.
 
 ---
 
@@ -138,7 +142,7 @@ sequenceDiagram
 
 The verifier uses DCQL (Digital Credentials Query Language) to request specific claims from credentials.
 
-Sample (demo):
+SD-JWT sample (demo):
 ```json
 {
   "client_id": "x509_hash:a54_NCUlnbgC-1PfaZIppUTinKy4ITcmSo6KtXxyFCE",
@@ -175,6 +179,28 @@ Sample (demo):
 }
 ```
 
+For mDoc credentials, the DCQL query uses `mso_mdoc` format with a `doctype_value` and two-element claim paths `[namespace, elementIdentifier]`:
+```json
+{
+  "dcql_query": {
+    "credentials": [
+      {
+        "id": "pda1_credential",
+        "format": "mso_mdoc",
+        "meta": {
+          "doctype_value": "eu.europa.ec.eudi.pda1.1"
+        },
+        "claims": [
+          { "path": ["eu.europa.ec.eudi.pda1.1", "credential_holder"] },
+          { "path": ["eu.europa.ec.eudi.pda1.1", "nationality"] },
+          { "path": ["eu.europa.ec.eudi.pda1.1", "competent_institution"] }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ### vp_token Response
 
 The wallet sends an encrypted JWE containing the vp_token in DCQL format:
@@ -187,6 +213,8 @@ The wallet sends an encrypted JWE containing the vp_token in DCQL format:
   "state": "optional-state-value"
 }
 ```
+
+For mDoc credentials, the vp_token value is a base64url-encoded CBOR `DeviceResponse` containing `DeviceAuth` (COSE_Sign1 with session transcript) and the disclosed data elements.
 
 Sample vp_token (demo):
 ```
@@ -233,6 +261,7 @@ This implementation includes the following HAIP-compliant features:
 | **x509_hash client_id** | Client identification via SHA-256 hash of DER-encoded certificate |
 | **DCQL** | Digital Credentials Query Language for credential requests |
 | **dc+sd-jwt** | HAIP-compliant credential format with x5c header |
+| **mso_mdoc** | ISO 18013-5 mDoc credential format with COSE_Sign1 IssuerAuth |
 | **VP Encryption** | Response encryption using ECDH-ES + A256GCM |
 | **haip-vp:// scheme** | HAIP-compliant URI scheme for wallet invocation |
 
