@@ -54,11 +54,13 @@ public class IssuerMetadataController {
         config.put("proof_types_supported", Map.of(
                 "jwt", Map.of("proof_signing_alg_values_supported", List.of("ES256"))
         ));
-        config.put("display", List.of(Map.of(
-                "name", "Portable Document A1",
-                "locale", "en"
-        )));
-        config.put("claims", buildSdJwtClaimsMetadata());
+        config.put("credential_metadata", Map.of(
+                "display", List.of(Map.of(
+                        "name", "PDA1 (SD-JWT VC)",
+                        "locale", "en"
+                )),
+                "claims", buildSdJwtClaimsMetadata()
+        ));
         return config;
     }
 
@@ -72,11 +74,13 @@ public class IssuerMetadataController {
         config.put("proof_types_supported", Map.of(
                 "jwt", Map.of("proof_signing_alg_values_supported", List.of("ES256"))
         ));
-        config.put("display", List.of(Map.of(
-                "name", "Portable Document A1 (mDoc)",
-                "locale", "en"
-        )));
-        config.put("claims", buildMDocClaimsMetadata());
+        config.put("credential_metadata", Map.of(
+                "display", List.of(Map.of(
+                        "name", "PDA1 (MSO Mdoc)",
+                        "locale", "en"
+                )),
+                "claims", buildMDocClaimsMetadata()
+        ));
         return config;
     }
 
@@ -85,24 +89,26 @@ public class IssuerMetadataController {
                 // credential_holder nested claims
                 buildClaimMetadata(List.of("credential_holder", "family_name"), "Family Name", true),
                 buildClaimMetadata(List.of("credential_holder", "given_name"), "Given Name", true),
-                buildClaimMetadata(List.of("credential_holder", "birth_date"), "Birth Date", false),
+                buildClaimMetadata(List.of("credential_holder", "birth_date"), "Birth Date", true),
                 // competent_institution nested claims
                 buildClaimMetadata(List.of("competent_institution", "country_code"), "Country Code", true),
-                buildClaimMetadata(List.of("competent_institution", "institution_id"), "Institution ID", false),
-                buildClaimMetadata(List.of("competent_institution", "institution_name"), "Institution Name", true)
+                buildClaimMetadata(List.of("competent_institution", "institution_id"), "Institution ID", true),
+                buildClaimMetadata(List.of("competent_institution", "institution_name"), "Institution Name", false)
         );
     }
 
     private List<Map<String, Object>> buildMDocClaimsMetadata() {
         return List.of(
-                // credential_holder nested claims
-                buildClaimMetadata(List.of("credential_holder", "family_name"), "Family Name", true),
-                buildClaimMetadata(List.of("credential_holder", "given_name"), "Given Name", true),
-                buildClaimMetadata(List.of("credential_holder", "birth_date"), "Birth Date", false),
-                // competent_institution nested claims
-                buildClaimMetadata(List.of("competent_institution", "country_code"), "Country Code", true),
-                buildClaimMetadata(List.of("competent_institution", "institution_id"), "Institution ID", false),
-                buildClaimMetadata(List.of("competent_institution", "institution_name"), "Institution Name", true)
+                // credential_holder element and nested claims
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "credential_holder"), "Credential Holder", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "credential_holder", "family_name"), "Family Name", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "credential_holder", "given_name"), "Given Name", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "credential_holder", "birth_date"), "Birth Date", true),
+                // competent_institution element and nested claims
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "competent_institution"), "Competent Institution", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "competent_institution", "country_code"), "Country Code", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "competent_institution", "institution_id"), "Institution ID", true),
+                buildClaimMetadata(List.of(MDOC_NAMESPACE, "competent_institution", "institution_name"), "Institution Name", false)
         );
     }
 
