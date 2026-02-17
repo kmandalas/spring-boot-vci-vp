@@ -95,7 +95,7 @@ Credentials can also be issued in `mso_mdoc` format (ISO 18013-5). The mDoc cred
 
 ## Demo wallet app (Android)
 
-Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions.
+Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions and [screen recordings](https://www.youtube.com/@kmandalas)
 
 ---
 
