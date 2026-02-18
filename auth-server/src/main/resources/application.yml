@@ -42,4 +42,4 @@ app:
     max-wia-age-seconds: 86400
   require-consent: false
   extra-redirect-uris:
-    - https://demo.certification.openid.net/test/a/kmandalas-pda1-issuer/callback
+    - https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback
