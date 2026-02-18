@@ -30,8 +30,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,13 +45,13 @@ public class AuthorizationServerConfig {
 
     private final WalletAttestationProperties walletAttestationProperties;
     private final String authorizationServerIssuer;
-    private final List<String> extraRedirectUris;
+    private final String extraRedirectUris;
     private final boolean requireConsent;
 
     public AuthorizationServerConfig(
             WalletAttestationProperties walletAttestationProperties,
             @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer,
-            @Value("${app.extra-redirect-uris:}") List<String> extraRedirectUris,
+            @Value("${app.extra-redirect-uris:}") String extraRedirectUris,
             @Value("${app.require-consent:true}") boolean requireConsent) {
         this.walletAttestationProperties = walletAttestationProperties;
         this.authorizationServerIssuer = authorizationServerIssuer;
@@ -187,7 +187,12 @@ public class AuthorizationServerConfig {
         Set<String> redirectUris = new HashSet<>();
         redirectUris.add("myapp://callback");
         redirectUris.add("https://oauth.pstmn.io/v1/callback");
-        redirectUris.addAll(extraRedirectUris);
+        if (extraRedirectUris != null && !extraRedirectUris.isBlank()) {
+            Arrays.stream(extraRedirectUris.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(redirectUris::add);
+        }
         return redirectUris;
     }
 

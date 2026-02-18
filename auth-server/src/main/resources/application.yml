@@ -21,7 +21,7 @@ app:
     max-pop-age-seconds: 300
     max-wia-age-seconds: 86400
   require-consent: true
-  extra-redirect-uris: []
+  extra-redirect-uris: ""
 
 ---
 spring:
@@ -41,5 +41,4 @@ app:
     max-pop-age-seconds: 300
     max-wia-age-seconds: 86400
   require-consent: false
-  extra-redirect-uris:
-    - https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback
+  extra-redirect-uris: "https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback"
