@@ -105,18 +105,28 @@ public class CredentialIssuerService {
      * @return wallet's public JWK if valid, null otherwise
      */
     public JWK validateCredentialRequest(CredentialRequest request) {
-        if (request == null || request.proof() == null || request.proof().jwt() == null) {
+        if (request == null) {
             return null;
         }
 
-        // Check that proof type is "jwt"
+        // OID4VCI 1.0: proofs { "jwt": ["eyJ..."] }
+        if (request.proofs() != null) {
+            List<String> jwtProofs = request.proofs().get("jwt");
+            if (jwtProofs == null || jwtProofs.isEmpty()) {
+                return null;
+            }
+            return validateProof(jwtProofs.getFirst());
+        }
+
+        // Legacy: proof { "proof_type": "jwt", "jwt": "..." }
+        if (request.proof() == null || request.proof().jwt() == null) {
+            return null;
+        }
         if (!"jwt".equals(request.proof().proofType())) {
             return null;
         }
-
-        String proofJwt = request.proof().jwt();
-        return validateProof(proofJwt);
-    } // todo - check also format, credentialConfigurationId?
+        return validateProof(request.proof().jwt());
+    }
 
     /**
      * Validates JWT proof: algorithm, type, audience, freshness, nonce, and signature.

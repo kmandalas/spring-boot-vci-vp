@@ -22,14 +22,14 @@ public class CredentialIssuerController {
     }
 
     /**
-     * Endpoint to get a nonce for credential issuance
+     * Endpoint to get a nonce for credential issuance (OID4VCI 1.0: POST)
      */
-    @GetMapping("/nonce")
+    @PostMapping("/nonce")
     public ResponseEntity<Map<String, Object>> getNonce() {
         String nonce = credentialIssuerService.generateCredentialNonce();
         return ResponseEntity.ok(Map.of(
-                "c_nonce", nonce,
-                "c_nonce_expires_in", 300 // 5 minutes
+                "nonce", nonce,
+                "nonce_expires_in", 300 // 5 minutes
         ));
     }
 
@@ -58,7 +58,6 @@ public class CredentialIssuerController {
         String credential = credentialIssuerService.issueCredential(format, walletKey, username);
 
         return ResponseEntity.ok(Map.of(
-                "format", format.value(),
                 "credential", credential
         ));
     }

@@ -31,6 +31,7 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -44,12 +45,18 @@ public class AuthorizationServerConfig {
 
     private final WalletAttestationProperties walletAttestationProperties;
     private final String authorizationServerIssuer;
+    private final List<String> extraRedirectUris;
+    private final boolean requireConsent;
 
     public AuthorizationServerConfig(
             WalletAttestationProperties walletAttestationProperties,
-            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer) {
+            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer,
+            @Value("${app.extra-redirect-uris:}") List<String> extraRedirectUris,
+            @Value("${app.require-consent:true}") boolean requireConsent) {
         this.walletAttestationProperties = walletAttestationProperties;
         this.authorizationServerIssuer = authorizationServerIssuer;
+        this.extraRedirectUris = extraRedirectUris;
+        this.requireConsent = requireConsent;
     }
 
     @Bean
@@ -136,7 +143,7 @@ public class AuthorizationServerConfig {
                         .build())
                 .clientSettings(ClientSettings.builder()
                         .requireProofKey(true)  // PKCE required (S256)
-                        .requireAuthorizationConsent(true)
+                        .requireAuthorizationConsent(requireConsent)
                         .build())
                 .build();
         return new InMemoryRegisteredClientRepository(registeredClient);
@@ -176,10 +183,11 @@ public class AuthorizationServerConfig {
         return new InMemoryOAuth2AuthorizationConsentService();
     }
 
-    private static Set<String> getRedirectUris() {
+    private Set<String> getRedirectUris() {
         Set<String> redirectUris = new HashSet<>();
         redirectUris.add("myapp://callback");
         redirectUris.add("https://oauth.pstmn.io/v1/callback");
+        redirectUris.addAll(extraRedirectUris);
         return redirectUris;
     }
 
