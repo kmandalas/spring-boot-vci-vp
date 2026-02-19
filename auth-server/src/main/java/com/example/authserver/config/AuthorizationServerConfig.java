@@ -109,11 +109,14 @@ public class AuthorizationServerConfig {
                 .pushedAuthorizationRequestEndpoint(withDefaults())
                 .oidc(oidc -> oidc
                     .providerConfigurationEndpoint(providerConfigurationEndpoint ->
-                        providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration ->
-                            providerConfiguration.scopes(scopes -> {
-                                scopes.add("eu.europa.ec.eudi.pda1.1");
-                            })
-                        )
+                        providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration -> {
+                            providerConfiguration.scopes(scopes ->
+                                scopes.add("eu.europa.ec.eudi.pda1.1")
+                            );
+                            providerConfiguration.tokenEndpointAuthenticationMethods(methods ->
+                                methods.add(WalletAttestationAuthenticationToken.ATTEST_JWT_CLIENT_AUTH.getValue())
+                            );
+                        })
                     )
                 )
             )
