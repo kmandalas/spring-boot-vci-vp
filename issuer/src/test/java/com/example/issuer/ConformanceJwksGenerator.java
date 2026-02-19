@@ -1,5 +1,6 @@
 package com.example.issuer;
 
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
@@ -38,8 +39,8 @@ class ConformanceJwksGenerator {
         Security.addProvider(new BouncyCastleProvider());
 
         // --- 1 & 2: Fresh client key pairs ---
-        ECKey client1 = new ECKeyGenerator(Curve.P_256).generate();
-        ECKey client2 = new ECKeyGenerator(Curve.P_256).generate();
+        ECKey client1 = new ECKeyGenerator(Curve.P_256).algorithm(JWSAlgorithm.ES256).keyID("client1-key").generate();
+        ECKey client2 = new ECKeyGenerator(Curve.P_256).algorithm(JWSAlgorithm.ES256).keyID("client2-key").generate();
 
         System.out.println("============================================================");
         System.out.println("  Client 1 JWKS  →  paste into: Client > jwks");
@@ -69,6 +70,8 @@ class ConformanceJwksGenerator {
         // Build JWK with private key + x5c
         ECKey attesterJwk = new ECKey.Builder(Curve.P_256, publicKey)
                 .privateKey(privateKey)
+                .algorithm(JWSAlgorithm.ES256)
+                .keyID("attester-key")
                 .x509CertChain(List.of(Base64.encode(cert.getEncoded())))
                 .build();
 
