@@ -1,26 +1,22 @@
-FROM ghcr.io/graalvm/native-image-community:latest as build
+FROM eclipse-temurin:21-jdk as build
 WORKDIR /workspace/app
 
 # Copy the project files
 COPY ../pom.xml ../
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests -Pnative,enhance native:compile
+RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
 
-FROM ghcr.io/linuxcontainers/alpine:3.20
+FROM eclipse-temurin:21-jre
 
 VOLUME /tmp
-RUN apk add --no-cache libc6-compat
 
 # Set the Spring profile to 'cloud'
 ENV SPRING_PROFILES_ACTIVE=cloud
 
-COPY --from=build /workspace/app/target/auth-server /app/auth-server
+COPY --from=build /workspace/app/target/*.jar /app/auth-server.jar
 
 # Expose the application's port
 EXPOSE 9000
 
-ENTRYPOINT ["/app/auth-server"]
-
-# CMD with dynamic port
-# CMD ["sh", "-c", "/app/auth-server -Dserver.port=${PORT:-9000}"]
+ENTRYPOINT ["java", "-jar", "/app/auth-server.jar"]

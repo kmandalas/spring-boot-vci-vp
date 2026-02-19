@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.server.authorization.client.InMemoryR
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -181,6 +182,18 @@ public class AuthorizationServerConfig {
     @Bean
     public OAuth2AuthorizationConsentService authorizationConsentService() {
         return new InMemoryOAuth2AuthorizationConsentService();
+    }
+
+    /**
+     * Explicit AuthorizationServerSettings ensures the issuer is configured so that
+     * Spring Authorization Server includes the 'iss' parameter in authorization responses
+     * per RFC 9207 (Authorization Server Issuer Identification).
+     */
+    @Bean
+    public AuthorizationServerSettings authorizationServerSettings() {
+        return AuthorizationServerSettings.builder()
+                .issuer(authorizationServerIssuer)
+                .build();
     }
 
     private Set<String> getRedirectUris() {
