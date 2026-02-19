@@ -68,7 +68,7 @@ public class CredentialIssuerController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue())
                 .body(Map.of(
-                        "credentials", List.of(credential)
+                        "credentials", List.of(Map.of("credential", credential))
                 ));
     }
 
