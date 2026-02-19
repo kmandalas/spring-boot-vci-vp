@@ -22,13 +22,17 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -81,6 +85,20 @@ public class AuthorizationServerConfig {
                 .authorizationEndpoint(authorizationEndpoint ->
                     authorizationEndpoint
                         .consentPage("/oauth2/consent")
+                        // RFC 9207: include 'iss' in the authorization code redirect
+                        .authorizationResponseHandler((request, response, authentication) -> {
+                            OAuth2AuthorizationCodeRequestAuthenticationToken auth =
+                                    (OAuth2AuthorizationCodeRequestAuthenticationToken) authentication;
+                            UriComponentsBuilder uriBuilder = UriComponentsBuilder
+                                    .fromUriString(auth.getRedirectUri())
+                                    .queryParam("code", auth.getAuthorizationCode().getTokenValue())
+                                    .queryParam("iss", authorizationServerIssuer);
+                            if (StringUtils.hasText(auth.getState())) {
+                                uriBuilder.queryParam("state", auth.getState());
+                            }
+                            new DefaultRedirectStrategy().sendRedirect(
+                                    request, response, uriBuilder.build().encode().toUriString());
+                        })
                 )
                 // Register WIA authentication for client authentication
                 .clientAuthentication(clientAuth -> clientAuth
