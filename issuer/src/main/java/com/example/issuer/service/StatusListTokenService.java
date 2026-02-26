@@ -1,10 +1,14 @@
 package com.example.issuer.service;
 
+import com.example.issuer.config.AppMetadataConfig;
 import com.example.issuer.model.CredentialStatusEntry;
 import com.example.issuer.model.StatusList;
 import com.example.issuer.repository.CredentialStatusRepository;
 import com.example.issuer.repository.StatusListRepository;
-import com.nimbusds.jose.*;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.util.Base64;
@@ -27,13 +31,16 @@ public class StatusListTokenService {
     private final StatusListRepository statusListRepository;
     private final CredentialStatusRepository credentialStatusRepository;
     private final IssuerSigningService issuerSigningService;
+    private final AppMetadataConfig appMetadataConfig;
 
     public StatusListTokenService(StatusListRepository statusListRepository,
                                    CredentialStatusRepository credentialStatusRepository,
-                                   IssuerSigningService issuerSigningService) {
+                                   IssuerSigningService issuerSigningService,
+                                   AppMetadataConfig appMetadataConfig) {
         this.statusListRepository = statusListRepository;
         this.credentialStatusRepository = credentialStatusRepository;
         this.issuerSigningService = issuerSigningService;
+        this.appMetadataConfig = appMetadataConfig;
     }
 
     /**
@@ -55,7 +62,7 @@ public class StatusListTokenService {
         String lst = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(compressed);
 
         // Build and sign JWT
-        return buildStatusListJwt(statusList, lst);
+        return buildStatusListJwt(statusList, lst, listId);
     }
 
     /**
@@ -106,7 +113,7 @@ public class StatusListTokenService {
     /**
      * Build and sign the Status List JWT.
      */
-    private String buildStatusListJwt(StatusList statusList, String lst) {
+    private String buildStatusListJwt(StatusList statusList, String lst, String listId) {
         try {
             JWK signingKey = issuerSigningService.getSigningKey();
             List<Base64> x5cChain = issuerSigningService.getX5cChain();
@@ -119,9 +126,13 @@ public class StatusListTokenService {
                     .build();
 
             long now = Instant.now().getEpochSecond();
+            String statusListUri = appMetadataConfig.getEndpoints().getStatusList() + "/" + listId;
 
             JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                    .subject(statusListUri)
+                    .issuer(appMetadataConfig.getClaims().getIss())
                     .issueTime(java.util.Date.from(Instant.ofEpochSecond(now)))
+                    .expirationTime(java.util.Date.from(Instant.ofEpochSecond(now + 86400)))
                     .claim("status_list", Map.of(
                             "bits", statusList.bits(),
                             "lst", lst
@@ -139,4 +150,5 @@ public class StatusListTokenService {
             throw new RuntimeException("Failed to generate status list token", e);
         }
     }
+
 }
