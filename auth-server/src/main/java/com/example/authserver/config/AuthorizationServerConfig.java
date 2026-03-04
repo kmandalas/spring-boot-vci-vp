@@ -22,14 +22,20 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -44,12 +50,18 @@ public class AuthorizationServerConfig {
 
     private final WalletAttestationProperties walletAttestationProperties;
     private final String authorizationServerIssuer;
+    private final String extraRedirectUris;
+    private final boolean requireConsent;
 
     public AuthorizationServerConfig(
             WalletAttestationProperties walletAttestationProperties,
-            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer) {
+            @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer,
+            @Value("${app.extra-redirect-uris:}") String extraRedirectUris,
+            @Value("${app.require-consent:true}") boolean requireConsent) {
         this.walletAttestationProperties = walletAttestationProperties;
         this.authorizationServerIssuer = authorizationServerIssuer;
+        this.extraRedirectUris = extraRedirectUris;
+        this.requireConsent = requireConsent;
     }
 
     @Bean
@@ -73,6 +85,20 @@ public class AuthorizationServerConfig {
                 .authorizationEndpoint(authorizationEndpoint ->
                     authorizationEndpoint
                         .consentPage("/oauth2/consent")
+                        // RFC 9207: include 'iss' in the authorization code redirect
+                        .authorizationResponseHandler((request, response, authentication) -> {
+                            OAuth2AuthorizationCodeRequestAuthenticationToken auth =
+                                    (OAuth2AuthorizationCodeRequestAuthenticationToken) authentication;
+                            UriComponentsBuilder uriBuilder = UriComponentsBuilder
+                                    .fromUriString(auth.getRedirectUri())
+                                    .queryParam("code", auth.getAuthorizationCode().getTokenValue())
+                                    .queryParam("iss", authorizationServerIssuer);
+                            if (StringUtils.hasText(auth.getState())) {
+                                uriBuilder.queryParam("state", auth.getState());
+                            }
+                            new DefaultRedirectStrategy().sendRedirect(
+                                    request, response, uriBuilder.build().encode().toUriString());
+                        })
                 )
                 // Register WIA authentication for client authentication
                 .clientAuthentication(clientAuth -> clientAuth
@@ -83,11 +109,14 @@ public class AuthorizationServerConfig {
                 .pushedAuthorizationRequestEndpoint(withDefaults())
                 .oidc(oidc -> oidc
                     .providerConfigurationEndpoint(providerConfigurationEndpoint ->
-                        providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration ->
-                            providerConfiguration.scopes(scopes -> {
-                                scopes.add("eu.europa.ec.eudi.pda1.1");
-                            })
-                        )
+                        providerConfigurationEndpoint.providerConfigurationCustomizer(providerConfiguration -> {
+                            providerConfiguration.scopes(scopes ->
+                                scopes.add("eu.europa.ec.eudi.pda1.1")
+                            );
+                            providerConfiguration.tokenEndpointAuthenticationMethods(methods ->
+                                methods.add(WalletAttestationAuthenticationToken.ATTEST_JWT_CLIENT_AUTH.getValue())
+                            );
+                        })
                     )
                 )
             )
@@ -136,7 +165,7 @@ public class AuthorizationServerConfig {
                         .build())
                 .clientSettings(ClientSettings.builder()
                         .requireProofKey(true)  // PKCE required (S256)
-                        .requireAuthorizationConsent(true)
+                        .requireAuthorizationConsent(requireConsent)
                         .build())
                 .build();
         return new InMemoryRegisteredClientRepository(registeredClient);
@@ -176,10 +205,28 @@ public class AuthorizationServerConfig {
         return new InMemoryOAuth2AuthorizationConsentService();
     }
 
-    private static Set<String> getRedirectUris() {
+    /**
+     * Explicit AuthorizationServerSettings ensures the issuer is configured so that
+     * Spring Authorization Server includes the 'iss' parameter in authorization responses
+     * per RFC 9207 (Authorization Server Issuer Identification).
+     */
+    @Bean
+    public AuthorizationServerSettings authorizationServerSettings() {
+        return AuthorizationServerSettings.builder()
+                .issuer(authorizationServerIssuer)
+                .build();
+    }
+
+    private Set<String> getRedirectUris() {
         Set<String> redirectUris = new HashSet<>();
         redirectUris.add("myapp://callback");
         redirectUris.add("https://oauth.pstmn.io/v1/callback");
+        if (extraRedirectUris != null && !extraRedirectUris.isBlank()) {
+            Arrays.stream(extraRedirectUris.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(redirectUris::add);
+        }
         return redirectUris;
     }
 

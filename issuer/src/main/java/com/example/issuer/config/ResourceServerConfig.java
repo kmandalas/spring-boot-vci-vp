@@ -18,6 +18,7 @@ public class ResourceServerConfig {
                         .requestMatchers("/.well-known/jwks.json").permitAll()
                         .requestMatchers("/.well-known/status-list/**").permitAll()
                         .requestMatchers("/admin/revoke").permitAll()
+                        .requestMatchers("/credential/nonce").permitAll()
                         .anyRequest().authenticated()
                 )
                 // Spring Security 6.5+ has built-in DPoP support enabled by default

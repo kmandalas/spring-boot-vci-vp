@@ -77,12 +77,6 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
             // Validate PoP JWT using wallet public key from WIA
             validatePopJwt(popJwt, walletPublicKey);
 
-            // Optional: Verify WIA↔DPoP key binding (defense-in-depth, not required by spec)
-            // Ensures the attested wallet instance is the same one making the DPoP-bound request
-            if (token.getDpopJwt() != null) {
-                verifyWiaDpopKeyBinding(walletPublicKey, token.getDpopJwt());
-            }
-
             // Look up registered client
             String clientId = (String) token.getPrincipal();
             RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
@@ -265,46 +259,6 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
         }
 
         logger.debug("PoP JWT validated successfully");
-    }
-
-    /**
-     * Verifies that the WIA's cnf.jwk matches the DPoP proof's public key.
-     * <p>
-     * NOTE: This is a defense-in-depth check, NOT required by draft-ietf-oauth-attestation-based-client-auth.
-     * The attestation spec only requires verifying the PoP JWT signature against WIA's cnf.jwk (Section 5.2).
-     * DPoP (RFC 9449) is a separate mechanism and the spec does not mandate binding between them.
-     * <p>
-     * However, when both WIA and DPoP are used together, verifying key consistency ensures
-     * the attested wallet instance (WIA) is the same one making the DPoP-bound request,
-     * preventing potential WIA theft/replay with a different key pair.
-     *
-     * @param wiaPublicKey the wallet's public key from WIA cnf.jwk
-     * @param dpopJwtString the DPoP proof JWT string
-     */
-    private void verifyWiaDpopKeyBinding(JWK wiaPublicKey, String dpopJwtString) {
-        try {
-            SignedJWT dpopJwt = SignedJWT.parse(dpopJwtString);
-            JWK dpopPublicKey = dpopJwt.getHeader().getJWK();
-
-            if (dpopPublicKey == null) {
-                throw authException("invalid_client", "DPoP proof missing jwk in header");
-            }
-
-            // Compare key thumbprints (ignores metadata like kid, use, alg)
-            if (!JwtSignatureUtils.keysMatch(wiaPublicKey, dpopPublicKey)) {
-                logger.warn("WIA↔DPoP key binding failed: WIA cnf.jwk does not match DPoP proof jwk");
-                throw authException("invalid_client",
-                        "WIA cnf.jwk does not match DPoP proof key - key binding violation");
-            }
-
-            logger.debug("WIA↔DPoP key binding verified successfully");
-
-        } catch (OAuth2AuthenticationException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error("Error verifying WIA↔DPoP key binding", e);
-            throw authException("invalid_client", "Failed to verify WIA↔DPoP key binding: " + e.getMessage());
-        }
     }
 
     /**

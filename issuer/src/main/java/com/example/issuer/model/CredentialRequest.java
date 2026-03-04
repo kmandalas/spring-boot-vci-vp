@@ -1,9 +1,18 @@
 package com.example.issuer.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.List;
+import java.util.Map;
+
 public record CredentialRequest(
         String format,
-        String credentialConfigurationId,
-        Proof proof
+        @JsonProperty("credential_configuration_id") String credentialConfigurationId,
+        Proof proof,
+        Map<String, List<String>> proofs
 ) {
-    public record Proof(String proofType, String jwt) {}
+    public record Proof(
+            @JsonProperty("proof_type") String proofType,
+            String jwt
+    ) {}
 }
