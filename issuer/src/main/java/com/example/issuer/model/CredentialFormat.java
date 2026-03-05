@@ -34,4 +34,15 @@ public enum CredentialFormat {
         throw new IllegalArgumentException("Unsupported credential format: " + format);
     }
 
+    /**
+     * Resolves a credential_configuration_id to a CredentialFormat.
+     * Falls back to DC_SD_JWT if the config ID is null or unrecognized.
+     */
+    public static CredentialFormat fromConfigId(String configId) {
+        if (configId != null && configId.contains("mso_mdoc")) {
+            return MSO_MDOC;
+        }
+        return DC_SD_JWT;
+    }
+
 }

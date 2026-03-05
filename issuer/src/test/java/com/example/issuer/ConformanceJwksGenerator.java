@@ -11,8 +11,8 @@ import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileReader;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -82,4 +82,5 @@ class ConformanceJwksGenerator {
         System.out.println("{\"keys\":[" + attesterJwk.toJSONString() + "]}");
         System.out.println();
     }
+
 }

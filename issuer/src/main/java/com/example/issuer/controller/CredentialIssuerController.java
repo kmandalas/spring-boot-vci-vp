@@ -59,8 +59,10 @@ public class CredentialIssuerController {
         // Extract username
         String username = authentication.getName();
 
-        // Determine format (defaults to dc+sd-jwt)
-        CredentialFormat format = CredentialFormat.fromValue(request.format());
+        // Determine format: prefer explicit format, fall back to credential_configuration_id
+        CredentialFormat format = request.format() != null && !request.format().isEmpty()
+                ? CredentialFormat.fromValue(request.format())
+                : CredentialFormat.fromConfigId(request.credentialConfigurationId());
 
         // Issue credential and build response
         String credential = credentialIssuerService.issueCredential(format, walletKey, username);
