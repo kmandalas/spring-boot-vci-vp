@@ -3,8 +3,8 @@ package com.example.verifier.service.credential;
 import com.authlete.sd.Disclosure;
 import com.authlete.sd.SDJWT;
 import com.authlete.sd.SDObjectDecoder;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory;
@@ -229,8 +229,6 @@ public class SdJwtVerifierService {
 
     /**
      * Extracts disclosed claims from an SD-JWT VP token using SDObjectDecoder.
-     * Handles two-level selective disclosure by re-decoding nested maps whose
-     * _sd arrays were not resolved during the first pass.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractDisclosedClaims(String sdJwt) {
@@ -246,19 +244,9 @@ public class SdJwtVerifierService {
             // Get the list of disclosures from the VP
             List<Disclosure> disclosures = vp.getDisclosures();
 
-            // First pass: decode top-level _sd entries
+            // Decode all _sd entries (sd-jwt 1.7 handles nested structures recursively)
             SDObjectDecoder decoder = new SDObjectDecoder();
             Map<String, Object> decoded = decoder.decode(payload, disclosures);
-
-            // Second pass: re-decode any nested map that still has an _sd key
-            for (Map.Entry<String, Object> entry : decoded.entrySet()) {
-                if (entry.getValue() instanceof Map) {
-                    Map<String, Object> nested = (Map<String, Object>) entry.getValue();
-                    if (nested.containsKey("_sd")) {
-                        entry.setValue(decoder.decode(nested, disclosures));
-                    }
-                }
-            }
 
             // Clean up _sd artifacts from all levels
             cleanSdArtifacts(decoded);

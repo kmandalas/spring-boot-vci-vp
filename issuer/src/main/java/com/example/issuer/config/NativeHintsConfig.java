@@ -17,14 +17,10 @@ import org.springframework.context.annotation.ImportRuntimeHints;
 public class NativeHintsConfig {
 
     private static final MemberCategory[] ALL_MEMBER_CATEGORIES = {
-            MemberCategory.PUBLIC_FIELDS,
-            MemberCategory.DECLARED_FIELDS,
-            MemberCategory.INTROSPECT_PUBLIC_CONSTRUCTORS,
-            MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
+            MemberCategory.ACCESS_PUBLIC_FIELDS,
+            MemberCategory.ACCESS_DECLARED_FIELDS,
             MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS,
             MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
-            MemberCategory.INTROSPECT_PUBLIC_METHODS,
-            MemberCategory.INTROSPECT_DECLARED_METHODS,
             MemberCategory.INVOKE_PUBLIC_METHODS,
             MemberCategory.INVOKE_DECLARED_METHODS
     };

@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
-public class ErrorController  implements org.springframework.boot.web.servlet.error.ErrorController {
+public class ErrorController  implements org.springframework.boot.webmvc.error.ErrorController {
 
     @GetMapping("/error")
     @ResponseBody
