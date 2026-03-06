@@ -36,6 +36,12 @@ public class NativeHintsConfig {
             // Records used by JdbcClient.query()
             hints.reflection().registerType(StatusList.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(CredentialStatusEntry.class, ALL_MEMBER_CATEGORIES);
+
+            // DPoP support: Spring Security 7 checks ClassUtils.isPresent() for this class
+            // to auto-enable DPoP — must be registered so native image doesn't return false
+            hints.reflection().registerTypeIfPresent(classLoader,
+                    "org.springframework.security.oauth2.jwt.DPoPProofJwtDecoderFactory",
+                    ALL_MEMBER_CATEGORIES);
         }
     }
 }
