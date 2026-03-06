@@ -1,22 +1,23 @@
-FROM eclipse-temurin:21-jdk as build
+FROM ghcr.io/graalvm/native-image-community:latest as build
 WORKDIR /workspace/app
 
 # Copy the project files
 COPY ../pom.xml ../
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests -Pnative,enhance native:compile
 
-FROM eclipse-temurin:21-jre
+FROM ghcr.io/linuxcontainers/alpine:3.20
 
 VOLUME /tmp
+RUN apk add --no-cache libc6-compat
 
 # Set the Spring profile to 'cloud'
 ENV SPRING_PROFILES_ACTIVE=cloud
 
-COPY --from=build /workspace/app/target/*.jar /app/issuer.jar
+COPY --from=build /workspace/app/target/issuer /app/issuer
 
 # Expose the application's port
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/issuer.jar"]
+ENTRYPOINT ["/app/issuer"]

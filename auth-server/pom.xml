@@ -56,7 +56,10 @@
                 <configuration>
                     <buildArgs>
                         <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
-                        <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/com.example/auth-server/reflect-config.json</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.json$</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.pem$</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.yml$</buildArg>
+                        <buildArg>-H:IncludeResources=.*\.html$</buildArg>
                     </buildArgs>
                 </configuration>
             </plugin>
