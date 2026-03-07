@@ -9,7 +9,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>dev.kmandalas</groupId>
     <artifactId>wallet-provider</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>wallet-provider</name>

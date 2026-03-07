@@ -14,7 +14,7 @@ spring:
 
 logging:
   level:
-    com.example.verifier: DEBUG
+    dev.kmandalas.verifier: DEBUG
 
 app:
   request-uri-store: http://${LOCAL_IP:localhost}:9002/verifier/request-object/
