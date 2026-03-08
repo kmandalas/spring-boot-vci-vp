@@ -38,7 +38,7 @@ app:
   wallet-attestation:
     trusted-issuers:
       - https://wallet-provider.onrender.com/wp
-    max-pop-age-seconds: 300
+    max-pop-age-seconds: 900  # Allow up to 15 min skew (Render server clock drift vs device)
     max-wia-age-seconds: 86400
   require-consent: false
   extra-redirect-uris: "https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback"
