@@ -83,6 +83,8 @@ wp:
     claims:
       audience: https://wallet-provider.onrender.com/wp
       iss: https://wallet-provider.onrender.com/wp
+    time:
+      max-proof-age-seconds: 900  # Allow up to 15 min skew (Render server clock drift)
   attestation:
     # Production: should always validate certificate chain
     skip-chain-validation: true
