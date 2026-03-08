@@ -40,8 +40,8 @@ public class CredentialIssuerService {
 
     private static final Logger logger = LoggerFactory.getLogger(CredentialIssuerService.class);
 
-    // Maximum age of a JWT proof in seconds (5 minutes)
-    private static final long MAX_PROOF_AGE_SECONDS = 300;
+    // Maximum age of a JWT proof in seconds (15 min to handle Render server clock drift)
+    private static final long MAX_PROOF_AGE_SECONDS = 900;
 
     private final Set<String> usedNonces = ConcurrentHashMap.newKeySet();
 
