@@ -310,4 +310,4 @@ Interested? Reach out via [GitHub](https://github.com/kmandalas) to discuss your
 
 ## License
 
-[Business Source License 1.1](./LICENSE) — free for non-production use. For production licensing, [contact me](https://github.com/kmandalas).
+[Business Source License 1.1](./LICENSE) — free for non-production use.
