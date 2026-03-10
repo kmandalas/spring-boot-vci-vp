@@ -298,7 +298,7 @@ If you need a production-ready solution, I can deliver a complete, end-to-end EU
 - **Production-grade storage** — Replace H2 with a production database of your choice (PostgreSQL, MySQL, CosmosDB, etc.); credential status, WUA, and session data on a robust, scalable store
 - **Key Vault integration** — AWS KMS, Azure Key Vault, or HashiCorp Vault for secret/key lifecycle management
 - **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (Redis) for JTI replay protection and session management
-- **iOS wallet app** — Companion iOS version of K-Wallet alongside the Android app
+- **Wallet apps (Android & iOS)** — Custom-branded and themed to your organisation's identity; delivered as your own product
 - **Complete EUDI solution** — Issuer + Verifier + Wallet App (Android & iOS) + Wallet Provider as a coherent, deployable product
 - **Admin consoles** — Management UIs for wallet provider, issuer, and verifier operations (credential revocation, status list monitoring, WUA management, audit logs)
 - **Multiple credential types** — Extend beyond the demo PDA1 to PID, mDL, EAA, and custom attestation types per your rulebooks
