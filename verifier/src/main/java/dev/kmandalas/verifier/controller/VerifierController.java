@@ -114,7 +114,7 @@ public class VerifierController {
             return ResponseEntity.ok("""
                 <html>
                 <head>
-                    <title>Demo Verifier Inc. VCI-VP demo</title>
+                    <title>K-Wallet VCI-VP demo</title>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
                     <style>
                         body {
@@ -160,7 +160,7 @@ public class VerifierController {
                     </style>
                 </head>
                 <body>
-                    <h2>Cognity VCI-VP demo <span class="format-badge">SD-JWT</span></h2>
+                    <h2>K-Wallet VCI-VP demo <span class="format-badge">SD-JWT</span></h2>
                     <p>Scan the QR code below with your phone</p>
                     <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
                     <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (sd-jwt)</p>
@@ -245,7 +245,7 @@ public class VerifierController {
             return ResponseEntity.ok("""
                 <html>
                 <head>
-                    <title>Demo Verifier Inc. VCI-VP demo (mDoc)</title>
+                    <title>K-Wallet VCI-VP demo (mDoc)</title>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
                     <style>
                         body {
@@ -291,7 +291,7 @@ public class VerifierController {
                     </style>
                 </head>
                 <body>
-                    <h2>Cognity VCI-VP demo <span class="format-badge">mDoc</span></h2>
+                    <h2>K-Wallet VCI-VP demo <span class="format-badge">mDoc</span></h2>
                     <p>Scan the QR code below with your phone</p>
                     <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
                     <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (mso_mdoc)</p>
