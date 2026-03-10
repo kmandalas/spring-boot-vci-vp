@@ -291,7 +291,7 @@ This repo contains an **experimental project** created for learning and demonstr
 This project is a **teaser** — a working proof-of-concept demonstrating a working EUDI-compliant ecosystem.
 If you need a production-ready solution, I can deliver a complete, end-to-end EUDI stack tailored to your needs:
 
-### What's available
+### What can be delivered
 
 - **HSM integration** — Hardware Security Module support for issuer and wallet-provider signing keys (LoA High compliance)
 - **Remote WSCA** — Remote Wallet Secure Cryptographic Application for hardware-backed key management without device dependency
