@@ -286,6 +286,28 @@ This repo contains an **experimental project** created for learning and demonstr
 
 ---
 
+## 💼 Enterprise & Professional Services
+
+This project is a **teaser** — a working proof-of-concept demonstrating a full EUDI-compliant ecosystem.
+If you need a production-ready solution, I can deliver a complete, end-to-end EUDI stack tailored to your needs:
+
+### What's available
+
+- **HSM integration** — Hardware Security Module support for issuer and wallet-provider signing keys (LoA High compliance)
+- **Remote WSCA** — Remote Wallet Secure Cryptographic Application for hardware-backed key management without device dependency
+- **Production-grade storage** — Replace H2 with a production database of your choice (PostgreSQL, MySQL, CosmosDB, etc.); credential status, WUA, and session data on a robust, scalable store
+- **Key Vault integration** — AWS KMS, Azure Key Vault, or HashiCorp Vault for secret/key lifecycle management
+- **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (Redis) for JTI replay protection and session management
+- **iOS wallet app** — Companion iOS version of K-Wallet alongside the Android app
+- **Complete EUDI solution** — Issuer + Verifier + Wallet App (Android & iOS) + Wallet Provider as a coherent, deployable product
+- **LoA High compliance** — Architecture and attestation chain designed to satisfy Level of Assurance High requirements under eIDAS 2.0 / ARF
+
+### Contact
+
+Interested? Reach out via [GitHub](https://github.com/kmandalas) to discuss your requirements.
+
+---
+
 ## License
 
 [Business Source License 1.1](./LICENSE) — free for non-production use. For production licensing, [contact me](https://github.com/kmandalas).
