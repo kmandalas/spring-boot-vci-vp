@@ -288,7 +288,7 @@ This repo contains an **experimental project** created for learning and demonstr
 
 ## 💼 Enterprise & Professional Services
 
-This project is a **teaser** — a working proof-of-concept demonstrating a working EUDI-compliant ecosystem.
+This project is a **teaser** — a working proof-of-concept demonstrating a fully functional EUDI-compliant ecosystem.
 If you need a production-ready solution, I can deliver a complete, end-to-end EUDI stack tailored to your needs:
 
 ### What can be delivered
