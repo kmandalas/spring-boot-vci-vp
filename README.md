@@ -300,6 +300,8 @@ If you need a production-ready solution, I can deliver a complete, end-to-end EU
 - **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (Redis) for JTI replay protection and session management
 - **iOS wallet app** — Companion iOS version of K-Wallet alongside the Android app
 - **Complete EUDI solution** — Issuer + Verifier + Wallet App (Android & iOS) + Wallet Provider as a coherent, deployable product
+- **Multiple credential types** — Extend beyond the demo PDA1 to PID, mDL, EAA, and custom attestation types per your rulebooks
+- **LoTL / Trust Validator** — ETSI TS 119 612 Lists of Trusted Lists integration for federated, EU-compliant trust infrastructure across issuers, verifiers, and wallet providers
 - **LoA High compliance** — Architecture and attestation chain designed to satisfy Level of Assurance High requirements under eIDAS 2.0 / ARF
 
 ### Contact
