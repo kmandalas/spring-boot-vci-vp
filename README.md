@@ -293,17 +293,24 @@ If you need a production-ready solution, I can deliver a complete, end-to-end EU
 
 ### What can be delivered
 
+#### Full-stack engagements
+
 - **HSM integration** — Hardware Security Module support for issuer and wallet-provider signing keys (LoA High compliance)
 - **Remote WSCA** — Remote Wallet Secure Cryptographic Application for hardware-backed key management without device dependency
 - **Production-grade storage** — Replace H2 with a production database of your choice (PostgreSQL, MySQL, CosmosDB, etc.); credential status, WUA, and session data on a robust, scalable store
 - **Key Vault integration** — AWS KMS, Azure Key Vault, or HashiCorp Vault for secret/key lifecycle management
-- **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (Redis) for JTI replay protection and session management
+- **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (e.g. Redis) for JTI replay protection, session management etc.
 - **Wallet apps (Android & iOS)** — Custom-branded and themed to your organisation's identity; delivered as your own product
 - **Complete EUDI solution** — Issuer + Verifier + Wallet App (Android & iOS) + Wallet Provider as a coherent, deployable product
 - **Admin consoles** — Management UIs for wallet provider, issuer, and verifier operations (credential revocation, status list monitoring, WUA management, audit logs)
 - **Multiple credential types** — Extend beyond the demo PDA1 to PID, mDL, EAA, and custom attestation types per your rulebooks
 - **LoTL / Trust Validator** — ETSI TS 119 612 Lists of Trusted Lists integration for federated, EU-compliant trust infrastructure across issuers, verifiers, and wallet providers
 - **LoA High compliance** — Architecture and attestation chain designed to satisfy Level of Assurance High requirements under eIDAS 2.0 / ARF
+
+#### Standalone / component engagements
+
+- **Standalone Verifier for Relying Parties** — If your use case is accepting EUDI wallet presentations — without issuing credentials or operating a wallet — I can consult on and implement a standalone, HAIP-compliant OID4VP verifier tailored to your credential types, trust model, and integration requirements; from architecture advice through to production implementation
+- **Standalone Issuer** — If you need to issue verifiable credentials (e.g. as a government agency, university, or bank) without operating a full EUDI stack, I can design and implement an OID4VCI-compliant issuer for your specific credential types and rulebooks, including integration with your Authentic Sources (civil registries, population registers, HR systems, or any internal database)
 
 ### Contact
 
