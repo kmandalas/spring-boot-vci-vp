@@ -1,5 +1,6 @@
 package dev.kmandalas.verifier.service;
 
+import dev.kmandalas.verifier.client.TrustValidatorClient;
 import dev.kmandalas.verifier.config.AppConfig;
 import dev.kmandalas.verifier.model.CredentialFormat;
 import dev.kmandalas.verifier.model.PresentationRequest;
@@ -8,14 +9,19 @@ import dev.kmandalas.verifier.service.credential.MDocVerifierService;
 import dev.kmandalas.verifier.service.credential.SdJwtVerifierService;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.util.Base64;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Orchestration service for VP (Verifiable Presentation) validation.
@@ -27,15 +33,18 @@ public class VpValidationService {
     private static final Logger logger = LoggerFactory.getLogger(VpValidationService.class);
 
     private final AppConfig appConfig;
+    private final TrustValidatorClient trustValidatorClient;
     private final StatusListTokenValidator statusListTokenValidator;
     private final SdJwtVerifierService sdJwtVerifierService;
     private final MDocVerifierService mDocVerifierService;
 
     public VpValidationService(AppConfig appConfig,
+                               TrustValidatorClient trustValidatorClient,
                                StatusListTokenValidator statusListTokenValidator,
                                SdJwtVerifierService sdJwtVerifierService,
                                MDocVerifierService mDocVerifierService) {
         this.appConfig = appConfig;
+        this.trustValidatorClient = trustValidatorClient;
         this.statusListTokenValidator = statusListTokenValidator;
         this.sdJwtVerifierService = sdJwtVerifierService;
         this.mDocVerifierService = mDocVerifierService;
@@ -107,22 +116,44 @@ public class VpValidationService {
      */
     private ValidationResult validateSdJwt(String vpToken) {
         try {
-            // Step 1: Extract issuer and validate against trusted list
+            // Step 1: Extract issuer and validate against trusted list (or trust-validator)
             String issuer = sdJwtVerifierService.extractIssuer(vpToken);
-            if (!appConfig.isTrustedIssuer(issuer)) {
-                logger.warn("Untrusted credential issuer: {}", issuer);
-                return ValidationResult.failure("Untrusted credential issuer: " + issuer);
+            if (appConfig.getTrustValidator().isEnabled()) {
+                List<Base64> x5cChain = sdJwtVerifierService.extractX5cChain(vpToken);
+                if (x5cChain == null || x5cChain.isEmpty()) {
+                    logger.warn("Credential has no x5c chain, required when trust-validator is enabled");
+                    return ValidationResult.failure("Credential x5c chain missing");
+                }
+                JWTClaimsSet credClaims = sdJwtVerifierService.getCredentialClaims(vpToken);
+                String vct = credClaims.getStringClaim("vct");
+                String context = appConfig.getTrustValidator().getVctToContext()
+                        .getOrDefault(vct, appConfig.getTrustValidator().getDefaultContext());
+                Optional<String> trustAnchor = trustValidatorClient.isTrusted(
+                        x5cChain, context, appConfig.getTrustValidator().getUrl());
+                if (trustAnchor.isEmpty()) {
+                    logger.warn("Credential chain not trusted by trust-validator (issuer={}, vct={})", issuer, vct);
+                    return ValidationResult.failure("Credential chain not trusted by trust-validator");
+                }
+                logger.info("Credential chain validated by trust-validator (anchor='{}')",
+                        certSubject(java.util.Base64.getDecoder().decode(trustAnchor.get())));
+            } else {
+                if (!appConfig.isTrustedIssuer(issuer)) {
+                    logger.warn("Untrusted credential issuer: {}", issuer);
+                    return ValidationResult.failure("Untrusted credential issuer: " + issuer);
+                }
+                logger.info("Credential issuer '{}' is trusted", issuer);
             }
-            logger.info("Credential issuer '{}' is trusted", issuer);
 
-            // Step 2: Fetch issuer's public key from JWKS endpoint
-            String jwksUrl = issuer + "/.well-known/jwks.json";
-            logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
-            JWKSet issuerJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
-            JWK jwksKey = issuerJwkSet.getKeys().getFirst();
-            logger.info("Loaded issuer public key from JWKS");
+            // Step 2: Fetch JWKS key for x5c cross-check (skipped when trust-validator already validated the chain)
+            JWK jwksKey = null;
+            if (!appConfig.getTrustValidator().isEnabled()) {
+                String jwksUrl = issuer + "/.well-known/jwks.json";
+                logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
+                jwksKey = JWKSet.load(URI.create(jwksUrl).toURL()).getKeys().getFirst();
+                logger.info("Loaded issuer public key from JWKS");
+            }
 
-            // Step 3: Verify SD-JWT (signature + binding JWT + claim extraction)
+            // Step 3: Verify SD-JWT — signing key extracted from x5c internally; JWKS key used for cross-check if provided
             SdJwtVerifierService.SdJwtValidationResult result =
                     sdJwtVerifierService.verifySdJwtPresentation(vpToken, jwksKey);
 
@@ -166,34 +197,54 @@ public class VpValidationService {
      */
     private ValidationResult validateMDoc(String vpToken, MDocVerificationContext context) {
         try {
-            // For mDoc validation, we need the issuer's public key
-            // Currently using the first trusted issuer's JWKS
-            // In production, you would determine the issuer from the mDoc's x5chain
-            if (appConfig.getTrustedIssuers().isEmpty()) {
-                return ValidationResult.failure("No trusted issuers configured for mDoc validation");
-            }
-
-            String issuer = appConfig.getTrustedIssuers().getFirst();
-            String jwksUrl = issuer + "/.well-known/jwks.json";
-            logger.debug("Fetching issuer JWKS from: {}", jwksUrl);
-
-            JWKSet issuerJwkSet = JWKSet.load(URI.create(jwksUrl).toURL());
-            JWK jwksKey = issuerJwkSet.getKeys().getFirst();
-
-            // Validate mDoc with DeviceAuth context
+            // Verify mDoc: key is extracted from IssuerAuth x5chain internally (ISO 18013-5)
             MDocVerifierService.MDocValidationResult mDocResult =
-                    mDocVerifierService.verifyMDocPresentation(vpToken, jwksKey, context);
+                    mDocVerifierService.verifyMDocPresentation(vpToken, context);
 
-            if (mDocResult.valid()) {
-                logger.info("mDoc VP verified - issuer='{}'", issuer);
-                return ValidationResult.success(issuer, mDocResult.disclosedClaims());
-            } else {
+            if (!mDocResult.valid()) {
                 return ValidationResult.failure("mDoc validation failed: " + mDocResult.error());
             }
+
+            // Trust validation using x5chain from the verified result
+            String issuer;
+            if (appConfig.getTrustValidator().isEnabled()) {
+                List<Base64> x5cChain = mDocResult.x5cChain();
+                if (x5cChain == null || x5cChain.isEmpty()) {
+                    return ValidationResult.failure("mDoc IssuerAuth has no x5chain");
+                }
+                String tvContext = appConfig.getTrustValidator().getDefaultContext();
+                Optional<String> trustAnchor = trustValidatorClient.isTrusted(
+                        x5cChain, tvContext, appConfig.getTrustValidator().getUrl());
+                if (trustAnchor.isEmpty()) {
+                    return ValidationResult.failure("mDoc chain not trusted by trust-validator");
+                }
+                logger.info("mDoc chain validated by trust-validator (context={}, anchor='{}')",
+                        tvContext, certSubject(java.util.Base64.getDecoder().decode(trustAnchor.get())));
+                issuer = certSubject(x5cChain.getFirst().decode()); // leaf cert CN as issuer identity
+            } else {
+                if (appConfig.getTrustedIssuers().isEmpty()) {
+                    return ValidationResult.failure("No trusted issuers configured for mDoc validation");
+                }
+                issuer = appConfig.getTrustedIssuers().getFirst();
+            }
+
+            logger.info("mDoc VP verified - issuer='{}'", issuer);
+            return ValidationResult.success(issuer, mDocResult.disclosedClaims());
 
         } catch (Exception e) {
             logger.error("mDoc VP validation failed", e);
             return ValidationResult.failure(e.getMessage());
+        }
+    }
+
+    /** Returns the Subject DN of a DER-encoded X.509 certificate, or a truncated fallback on error. */
+    private String certSubject(byte[] derBytes) {
+        try {
+            X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
+                    .generateCertificate(new ByteArrayInputStream(derBytes));
+            return cert.getSubjectX500Principal().getName();
+        } catch (Exception e) {
+            return "(unparseable cert)";
         }
     }
 

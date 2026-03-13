@@ -60,12 +60,13 @@ public class SdJwtVerifierService {
 
     /**
      * Verifies an SD-JWT VP token and extracts disclosed claims.
+     * Always uses the key from the x5c header for signature verification.
      *
-     * @param vpToken   the SD-JWT VP token
-     * @param issuerKey the issuer's public key for signature verification
+     * @param vpToken         the SD-JWT VP token
+     * @param jwksKey         the issuer's JWKS public key for cross-checking against x5c (null to skip)
      * @return SdJwtValidationResult with status and claims
      */
-    public SdJwtValidationResult verifySdJwtPresentation(String vpToken, JWK issuerKey) {
+    public SdJwtValidationResult verifySdJwtPresentation(String vpToken, JWK jwksKey) {
         try {
             // Step 1: Parse the VP Token
             SDJWT vp = SDJWT.parse(vpToken);
@@ -74,26 +75,30 @@ public class SdJwtVerifierService {
             SignedJWT credentialJwt = SignedJWT.parse(vp.getCredentialJwt());
             String issuer = credentialJwt.getJWTClaimsSet().getIssuer();
 
-            // Step 3: Extract and validate x5c key matches JWKS
-            JWK x5cKey = extractKeyFromX5c(credentialJwt);
-            if (x5cKey == null) {
+            // Step 3: Extract signing key from x5c (single extraction)
+            JWK signingKey = extractKeyFromX5c(credentialJwt);
+            if (signingKey == null) {
                 return SdJwtValidationResult.failure("Failed to extract key from x5c header");
             }
-            if (!keysMatch(issuerKey, x5cKey)) {
-                logger.warn("x5c key does not match JWKS key - possible tampering");
-                return SdJwtValidationResult.failure("x5c key does not match issuer JWKS");
-            }
-            logger.debug("x5c key matches JWKS key - cross-check passed");
 
-            // Step 4: Verify credential JWT signature
-            verifyCredentialJwt(vp, issuerKey);
+            // Step 4: If a JWKS key was provided (non-trust-validator path), cross-check it matches x5c
+            if (jwksKey != null) {
+                if (!keysMatch(jwksKey, signingKey)) {
+                    logger.warn("JWKS key does not match x5c key in credential - possible tampering");
+                    return SdJwtValidationResult.failure("JWKS key does not match x5c key in credential");
+                }
+                logger.debug("JWKS / x5c cross-check passed");
+            }
+
+            // Step 5: Verify credential JWT signature using x5c key
+            verifyCredentialJwt(vp, signingKey);
             logger.debug("Credential JWT signature verified");
 
-            // Step 5: Verify binding JWT (key binding proof)
+            // Step 6: Verify binding JWT (key binding proof)
             verifyBindingJwt(vp);
             logger.debug("Binding JWT signature verified");
 
-            // Step 6: Extract disclosed claims
+            // Step 7: Extract disclosed claims
             Map<String, Object> claims = extractDisclosedClaims(vpToken);
 
             return SdJwtValidationResult.success(issuer, claims);
@@ -123,6 +128,15 @@ public class SdJwtVerifierService {
     }
 
     /**
+     * Extracts the full x5c certificate chain from the credential JWT header.
+     */
+    public List<com.nimbusds.jose.util.Base64> extractX5cChain(String vpToken) throws ParseException {
+        SDJWT vp = SDJWT.parse(vpToken);
+        SignedJWT credentialJwt = SignedJWT.parse(vp.getCredentialJwt());
+        return credentialJwt.getHeader().getX509CertChain();
+    }
+
+    /**
      * Extracts the issuer's public key from the x5c certificate chain in the JWT header.
      */
     public JWK extractKeyFromX5c(SignedJWT credentialJwt) {
@@ -141,8 +155,6 @@ public class SdJwtVerifierService {
 
             // Extract EC public key and build JWK
             ECPublicKey ecPublicKey = (ECPublicKey) certificate.getPublicKey();
-            logger.debug("Extracted issuer public key from x5c header");
-
             return new ECKey.Builder(Curve.P_256, ecPublicKey).build();
 
         } catch (Exception e) {

@@ -4,7 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @ConfigurationProperties(prefix = "app")
@@ -69,6 +71,32 @@ public class AppConfig {
 
     public void setStatusCheckEnabled(boolean statusCheckEnabled) {
         this.statusCheckEnabled = statusCheckEnabled;
+    }
+
+    private TrustValidatorConfig trustValidator = new TrustValidatorConfig();
+
+    public TrustValidatorConfig getTrustValidator() {
+        return trustValidator;
+    }
+
+    public void setTrustValidator(TrustValidatorConfig trustValidator) {
+        this.trustValidator = trustValidator;
+    }
+
+    public static class TrustValidatorConfig {
+        private boolean enabled = false;
+        private String url;
+        private Map<String, String> vctToContext = new HashMap<>();
+        private String defaultContext = "QEAA";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+        public Map<String, String> getVctToContext() { return vctToContext; }
+        public void setVctToContext(Map<String, String> vctToContext) { this.vctToContext = vctToContext; }
+        public String getDefaultContext() { return defaultContext; }
+        public void setDefaultContext(String defaultContext) { this.defaultContext = defaultContext; }
     }
 
 }

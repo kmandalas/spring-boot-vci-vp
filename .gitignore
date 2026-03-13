@@ -38,3 +38,4 @@ build/
 credential_response.json
 notes/
 data/
+privkey.pem

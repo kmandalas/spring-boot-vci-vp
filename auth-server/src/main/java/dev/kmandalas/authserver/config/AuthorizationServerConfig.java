@@ -1,5 +1,6 @@
 package dev.kmandalas.authserver.config;
 
+import dev.kmandalas.authserver.client.TrustValidatorClient;
 import dev.kmandalas.authserver.wia.WalletAttestationAuthenticationConverter;
 import dev.kmandalas.authserver.wia.WalletAttestationAuthenticationProvider;
 import dev.kmandalas.authserver.wia.WalletAttestationAuthenticationToken;
@@ -49,16 +50,19 @@ public class AuthorizationServerConfig {
     private static final Logger logger = LoggerFactory.getLogger(AuthorizationServerConfig.class);
 
     private final WalletAttestationProperties walletAttestationProperties;
+    private final TrustValidatorClient trustValidatorClient;
     private final String authorizationServerIssuer;
     private final String extraRedirectUris;
     private final boolean requireConsent;
 
     public AuthorizationServerConfig(
             WalletAttestationProperties walletAttestationProperties,
+            TrustValidatorClient trustValidatorClient,
             @Value("${spring.security.oauth2.authorizationserver.issuer}") String authorizationServerIssuer,
             @Value("${app.extra-redirect-uris:}") String extraRedirectUris,
             @Value("${app.require-consent:true}") boolean requireConsent) {
         this.walletAttestationProperties = walletAttestationProperties;
+        this.trustValidatorClient = trustValidatorClient;
         this.authorizationServerIssuer = authorizationServerIssuer;
         this.extraRedirectUris = extraRedirectUris;
         this.requireConsent = requireConsent;
@@ -76,7 +80,8 @@ public class AuthorizationServerConfig {
         WalletAttestationAuthenticationProvider wiaProvider = new WalletAttestationAuthenticationProvider(
                 registeredClientRepository,
                 walletAttestationProperties,
-                authorizationServerIssuer
+                authorizationServerIssuer,
+                trustValidatorClient
         );
 
         http

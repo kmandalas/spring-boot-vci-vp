@@ -4,20 +4,29 @@ import com.authlete.cbor.*;
 import com.authlete.cose.COSEEC2Key;
 import com.authlete.cose.COSEKey;
 import com.authlete.cose.COSESign1;
+import com.authlete.cose.COSEUnprotectedHeader;
 import com.authlete.cose.COSEVerifier;
 import dev.kmandalas.verifier.util.MDocCBORHelper;
 import dev.kmandalas.verifier.util.MDocDigestHelper;
+import com.nimbusds.jose.jwk.Curve;
+import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
+import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.security.PublicKey;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.ECPublicKey;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,101 +44,121 @@ public class MDocVerifierService {
     private static final Logger logger = LoggerFactory.getLogger(MDocVerifierService.class);
 
     /**
-     * Result of mDoc verification containing status and disclosed claims.
+     * Result of mDoc verification containing status, disclosed claims, and the issuer x5chain.
+     * The x5chain (leaf cert first) is extracted from IssuerAuth and exposed for trust-validator use.
      */
-    public record MDocValidationResult(boolean valid, Map<String, Object> disclosedClaims, String error) {
-        public static MDocValidationResult success(Map<String, Object> claims) {
-            return new MDocValidationResult(true, claims, null);
+    public record MDocValidationResult(boolean valid, Map<String, Object> disclosedClaims, String error,
+                                       List<com.nimbusds.jose.util.Base64> x5cChain) {
+        public static MDocValidationResult success(Map<String, Object> claims, List<com.nimbusds.jose.util.Base64> chain) {
+            return new MDocValidationResult(true, claims, null, chain);
         }
 
         public static MDocValidationResult failure(String error) {
-            return new MDocValidationResult(false, Map.of(), error);
+            return new MDocValidationResult(false, Map.of(), error, null);
         }
     }
 
     /**
      * Verify an mDoc DeviceResponse presentation (without DeviceAuth verification).
-     * Use this overload when the presentation request context is not available.
-     *
-     * @param vpToken         Base64url-encoded CBOR DeviceResponse from wallet
-     * @param issuerPublicKey Issuer's public key for IssuerAuth verification
-     * @return MDocValidationResult with status and disclosed claims
      */
-    public MDocValidationResult verifyMDocPresentation(String vpToken, JWK issuerPublicKey) {
-        return verifyMDocPresentation(vpToken, issuerPublicKey, null);
+    public MDocValidationResult verifyMDocPresentation(String vpToken) {
+        return verifyMDocPresentation(vpToken, null);
     }
 
     /**
      * Verify an mDoc DeviceResponse presentation with full DeviceAuth verification.
+     * The issuer's public key is extracted from the IssuerAuth x5chain (COSE header label 33)
+     * per ISO 18013-5 — no external key required.
      *
-     * @param vpToken         Base64url-encoded CBOR DeviceResponse from wallet
-     * @param issuerPublicKey Issuer's public key for IssuerAuth verification
-     * @param context         SessionTranscript parameters for DeviceAuth verification (null to skip)
-     * @return MDocValidationResult with status and disclosed claims
+     * @param vpToken Base64url-encoded CBOR DeviceResponse from wallet
+     * @param context SessionTranscript parameters for DeviceAuth verification (null to skip)
+     * @return MDocValidationResult with status, disclosed claims, and the issuer x5chain
      */
-    public MDocValidationResult verifyMDocPresentation(String vpToken, JWK issuerPublicKey,
-                                                        MDocVerificationContext context) {
+    public MDocValidationResult verifyMDocPresentation(String vpToken, MDocVerificationContext context) {
         try {
             // Step 1: Decode base64url-encoded CBOR
             byte[] deviceResponseBytes = Base64.getUrlDecoder().decode(vpToken);
 
-            // Step 2: Parse DeviceResponse from CBOR (returns CBORPairList)
-            CBORDecoder decoder = new CBORDecoder(deviceResponseBytes);
-            Object deviceResponseObj = decoder.next();
+            // Step 2: Parse DeviceResponse
+            CBORPairList deviceResponseMap = (CBORPairList) new CBORDecoder(deviceResponseBytes).next();
 
-            CBORPairList deviceResponseMap = (CBORPairList) deviceResponseObj;
-
-            // Step 3: Get documents array
+            // Step 3: Get first document
             CBORPair documentsPair = deviceResponseMap.findByKey("documents");
             Assert.notNull(documentsPair, "DeviceResponse must contain 'documents' field");
-
             CBORItemList documents = (CBORItemList) documentsPair.getValue();
             Assert.isTrue(!documents.getItems().isEmpty(), "DeviceResponse must contain at least one document");
-
-            // Step 3.1: Parse first document (returns CBORPairList)
             CBORPairList documentMap = (CBORPairList) documents.getItems().getFirst();
 
-            // Step 4: Parse common structures once (used by multiple verification methods)
-            // Step 4.1: Extract IssuerSigned from document
+            // Step 4: Extract IssuerSigned and IssuerAuth
             CBORPair issuerSignedPair = documentMap.findByKey("issuerSigned");
             Assert.notNull(issuerSignedPair, "issuerSigned must be present in document");
             CBORPairList issuerSignedMap = (CBORPairList) issuerSignedPair.getValue();
 
-            // Step 4.2: Extract and build IssuerAuth COSESign1
             CBORPair issuerAuthPair = issuerSignedMap.findByKey("issuerAuth");
             Assert.notNull(issuerAuthPair, "issuerAuth must be present");
-            CBORItemList issuerAuthList = (CBORItemList) issuerAuthPair.getValue();
-            COSESign1 issuerAuth = COSESign1.build(issuerAuthList);
+            COSESign1 issuerAuth = COSESign1.build((CBORItemList) issuerAuthPair.getValue());
 
-            // Step 4.3: Parse MSO (Mobile Security Object) from IssuerAuth payload
+            // Step 5: Extract x5chain from IssuerAuth protected header (COSE label 33, per ISO 18013-5)
+            List<com.nimbusds.jose.util.Base64> x5cChain = extractX5cChain(issuerAuth);
+            Assert.notEmpty(x5cChain, "IssuerAuth must contain x5chain (COSE label 33)");
+            JWK issuerKey = keyFromChain(x5cChain);
+
+            // Step 6: Parse MSO and verify IssuerAuth signature
             CBORPairList msoMap = MDocCBORHelper.parseMSO(issuerAuth);
+            verifyIssuerAuth(issuerAuth, issuerKey);
 
-            // Step 5: Verify IssuerAuth (issuer's signature over MSO)
-            verifyIssuerAuth(issuerAuth, issuerPublicKey);
-
-            // Step 6: Verify ValidityInfo (credential expiration)
+            // Step 7: Verify ValidityInfo (credential expiration)
             verifyValidityInfo(msoMap);
 
-            // Step 7: Verify Digests (disclosed items match MSO hashes)
+            // Step 8: Verify Digests (disclosed items match MSO hashes)
             verifyDigests(msoMap, issuerSignedMap);
 
-            // Step 8: Verify DeviceAuth (proof of possession) if context provided
+            // Step 9: Verify DeviceAuth (proof of possession) if context provided
             if (context != null) {
                 verifyDeviceAuth(documentMap, msoMap, context);
             } else {
                 logger.debug("Skipping DeviceAuth verification (no context provided)");
             }
 
-            // Step 9: Extract disclosed claims
+            // Step 10: Extract disclosed claims
             Map<String, Object> disclosedClaims = extractDisclosedClaims(documentMap);
 
             logger.info("mDoc verification successful");
-            return MDocValidationResult.success(disclosedClaims);
+            return MDocValidationResult.success(disclosedClaims, x5cChain);
 
         } catch (Exception e) {
             logger.error("mDoc verification failed", e);
             return MDocValidationResult.failure(e.getMessage());
         }
+    }
+
+    /**
+     * Extracts the x5chain from the IssuerAuth unprotected header (COSE label 33).
+     * Per ISO 18013-5, the cert chain is always in the unprotected header of IssuerAuth.
+     */
+    private List<com.nimbusds.jose.util.Base64> extractX5cChain(COSESign1 issuerAuth) throws Exception {
+        COSEUnprotectedHeader unprotectedHeader = issuerAuth.getUnprotectedHeader();
+        List<X509Certificate> certs = unprotectedHeader != null ? unprotectedHeader.getX5Chain() : null;
+        if (certs == null || certs.isEmpty()) {
+            return List.of();
+        }
+        return certs.stream()
+                .map(cert -> {
+                    try {
+                        return com.nimbusds.jose.util.Base64.encode(cert.getEncoded());
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to encode certificate", e);
+                    }
+                })
+                .toList();
+    }
+
+    /** Extracts the leaf cert public key (EC P-256) from a DER chain. */
+    private JWK keyFromChain(List<com.nimbusds.jose.util.Base64> chain) throws Exception {
+        byte[] certDer = chain.getFirst().decode();
+        X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
+                .generateCertificate(new ByteArrayInputStream(certDer));
+        return new ECKey.Builder(Curve.P_256, (ECPublicKey) cert.getPublicKey()).build();
     }
 
     /**

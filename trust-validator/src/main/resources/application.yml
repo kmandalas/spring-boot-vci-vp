@@ -1,0 +1,41 @@
+server:
+  port: 8090
+
+spring:
+  messages:
+    basename: i18n/messages
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+    dev.kmandalas: DEBUG
+    eu.europa.esig.dss: WARN
+
+# cors
+cors:
+  origins: "*"
+  methods: "*"
+  headers: "*"
+  credentials: false
+  maxAge: 3600
+
+# DSS cache — directory for LoTL data caching
+# trust-validator.dss.cache-location=./dss-cache
+
+trust-validator:
+  trust-sources:
+    key-store:
+      location: classpath:local-trust.jks
+      key-store-type: JKS
+      password: changeit
+
+# Example LoTL trust source for Wallet Providers:
+# trust-validator.trust-sources.wallet-providers.lotl.location=https://trustedlist.serviceproviders.eudiw.dev/LOTL/01.xml
+# trust-validator.trust-sources.wallet-providers.lotl.issuance-service=http://uri.etsi.org/Svc/Svctype/Provider/Wallet
+# trust-validator.trust-sources.wallet-providers.lotl.revocation-service=http://uri.etsi.org/Svc/Svctype/Provider/Wallet

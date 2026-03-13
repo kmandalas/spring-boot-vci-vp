@@ -9,7 +9,7 @@ Related articles:
 
 ## Architecture
 
-The system consists of four independent Spring Boot applications:
+The system consists of five independent Spring Boot applications:
 
 | Module | Port | Description |
 |--------|------|-------------|
@@ -17,6 +17,7 @@ The system consists of four independent Spring Boot applications:
 | **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT and mDoc credentials with revocation support (publishes own Token Status List) |
 | **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, encrypted responses, and Token Status List revocation check |
 | **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
+| **trust-validator** | 8090 | X.509 trust chain validation service — decouples certificate trust evaluation from individual services (local-dev only, see below) |
 
 ## VCI
 
@@ -254,6 +255,24 @@ The wallet-provider module acts as the trust anchor for wallet instances and the
 **WUA (Wallet Unit Attestation)** — Issues `key-attestation+jwt` tokens after validating Android Key Attestation certificate chains against Google's root CA. The WUA captures the key's security level (software, TEE, or StrongBox) and maps it to ISO 18045 attack-potential resistance levels. The issuer checks the WUA before issuing credentials.
 
 **Token Status List** — Each WUA is assigned an index in a compressed bitstring published as a signed JWT (`application/statuslist+jwt`) per `draft-ietf-oauth-status-list`. The issuer fetches the status list and checks the relevant bit to determine whether a WUA has been revoked, providing a privacy-preserving revocation mechanism.
+
+---
+
+## Trust Validator
+
+The trust-validator is a standalone X.509 trust chain validation service that answers: *"is this certificate chain trusted for this verification context?"*
+
+It decouples trust evaluation from individual services — the auth-server, issuer, and verifier each delegate chain validation via a simple `POST /trust` call instead of embedding their own trust logic. This means the trust infrastructure can be upgraded (e.g. to EU Lists of Trusted Lists) without touching service code.
+
+**Currently enabled for local development only.** Each consumer has a feature flag (`trust-validator.enabled`) that is `true` in the default profile and `false` in the cloud profile. When disabled, consumers fall back to their configured `trusted-issuers` lists.
+
+**Key capabilities:**
+- **14 EUDI ARF verification contexts** — `WalletInstanceAttestation`, `PID`, `QEAA`, `PubEAA`, `EAA`, and their status-list counterparts, plus `WalletRelyingPartyAccessCertificate` and `Custom`
+- **Two trust source modes** — local KeyStore (ships with project CA, works out of the box) or EU LoTL via DSS with scheduled refresh
+- **Browser UI** at `http://localhost:8090/validate` for manual certificate chain testing
+- **Consumer integration** — identical `TrustValidatorClient` in auth-server (WIA chain), issuer (WUA chain), and verifier (credential issuer chain)
+
+In a production deployment, this service would sit on an internal network — its security posture (mTLS, service mesh, network isolation) depends on the zero-trust model of the environment.
 
 ---
 

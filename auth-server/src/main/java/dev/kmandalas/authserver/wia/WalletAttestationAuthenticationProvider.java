@@ -1,5 +1,6 @@
 package dev.kmandalas.authserver.wia;
 
+import dev.kmandalas.authserver.client.TrustValidatorClient;
 import dev.kmandalas.authserver.config.WalletAttestationProperties;
 import dev.kmandalas.authserver.util.JwtSignatureUtils;
 import com.nimbusds.jose.JOSEException;
@@ -22,7 +23,9 @@ import java.net.URI;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -49,6 +52,7 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
     private final RegisteredClientRepository registeredClientRepository;
     private final WalletAttestationProperties properties;
     private final String authorizationServerIssuer;
+    private final TrustValidatorClient trustValidatorClient;
 
     // In-memory JTI replay protection (use distributed cache in production)
     private final Set<String> usedJtis = ConcurrentHashMap.newKeySet();
@@ -56,10 +60,12 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
     public WalletAttestationAuthenticationProvider(
             RegisteredClientRepository registeredClientRepository,
             WalletAttestationProperties properties,
-            String authorizationServerIssuer) {
+            String authorizationServerIssuer,
+            TrustValidatorClient trustValidatorClient) {
         this.registeredClientRepository = registeredClientRepository;
         this.properties = properties;
         this.authorizationServerIssuer = authorizationServerIssuer;
+        this.trustValidatorClient = trustValidatorClient;
     }
 
     @Override
@@ -131,7 +137,10 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
 
         // Validate issuer is trusted
         String issuer = claims.getIssuer();
-        if (issuer == null || !properties.isTrustedIssuer(issuer)) {
+        if (issuer == null) {
+            throw authException("invalid_client", "WIA missing iss claim");
+        }
+        if (!properties.getTrustValidator().isEnabled() && !properties.isTrustedIssuer(issuer)) {
             throw authException("invalid_client", "WIA issuer not trusted: " + issuer);
         }
 
@@ -290,10 +299,21 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
             // First try to verify using x5c if present
             JWK x5cKey = JwtSignatureUtils.extractKeyFromX5c(wiaJwt);
             if (x5cKey != null) {
-                // Fetch JWKS to cross-check the x5c key
-                JWKSet jwkSet = fetchJwks(issuer);
-                if (jwkSet != null) {
-                    crossCheckX5cWithJwks(wiaJwt, x5cKey, jwkSet);
+                if (properties.getTrustValidator().isEnabled()) {
+                    // Validate chain via trust-validator (replaces string-based issuer check)
+                    List<com.nimbusds.jose.util.Base64> x5cChain = wiaJwt.getHeader().getX509CertChain();
+                    Optional<String> trustAnchor = trustValidatorClient.isTrusted(
+                            x5cChain, "WalletInstanceAttestation", properties.getTrustValidator().getUrl());
+                    if (trustAnchor.isEmpty()) {
+                        throw authException("invalid_client", "WIA chain not trusted by trust-validator");
+                    }
+                    logger.info("WIA chain validated by trust-validator (anchor={})", trustAnchor.get());
+                } else {
+                    // Fetch JWKS to cross-check the x5c key
+                    JWKSet jwkSet = fetchJwks(issuer);
+                    if (jwkSet != null) {
+                        crossCheckX5cWithJwks(wiaJwt, x5cKey, jwkSet);
+                    }
                 }
                 // Verify using x5c key
                 if (!JwtSignatureUtils.verifySignature(wiaJwt, x5cKey)) {
@@ -301,6 +321,10 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
                 }
                 logger.debug("WIA signature verified using x5c certificate");
                 return;
+            }
+
+            if (properties.getTrustValidator().isEnabled()) {
+                throw authException("invalid_client", "WIA must include x5c chain when trust-validator is enabled");
             }
 
             // No x5c, fetch JWKS and verify using kid

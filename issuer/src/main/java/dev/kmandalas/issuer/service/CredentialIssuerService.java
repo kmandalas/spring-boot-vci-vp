@@ -1,6 +1,7 @@
 package dev.kmandalas.issuer.service;
 
 import com.authlete.cose.COSEException;
+import dev.kmandalas.issuer.client.TrustValidatorClient;
 import dev.kmandalas.issuer.config.AppMetadataConfig;
 import dev.kmandalas.issuer.config.WalletProviderConfig;
 import dev.kmandalas.issuer.model.CredentialFormat;
@@ -31,6 +32,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,6 +49,7 @@ public class CredentialIssuerService {
 
     private final AppMetadataConfig appMetadataConfig;
     private final WalletProviderConfig walletProviderConfig;
+    private final TrustValidatorClient trustValidatorClient;
     private final StatusListValidationService statusListValidationService;
     private final StatusListIndexService statusListIndexService;
     private final CredentialStatusRepository credentialStatusRepository;
@@ -55,6 +58,7 @@ public class CredentialIssuerService {
 
     public CredentialIssuerService(AppMetadataConfig appMetadataConfig,
                                    WalletProviderConfig walletProviderConfig,
+                                   TrustValidatorClient trustValidatorClient,
                                    StatusListValidationService statusListValidationService,
                                    StatusListIndexService statusListIndexService,
                                    CredentialStatusRepository credentialStatusRepository,
@@ -62,6 +66,7 @@ public class CredentialIssuerService {
                                    MDocIssuerService mDocIssuerService) {
         this.appMetadataConfig = appMetadataConfig;
         this.walletProviderConfig = walletProviderConfig;
+        this.trustValidatorClient = trustValidatorClient;
         this.statusListValidationService = statusListValidationService;
         this.statusListIndexService = statusListIndexService;
         this.credentialStatusRepository = credentialStatusRepository;
@@ -225,11 +230,26 @@ public class CredentialIssuerService {
 
             // 2. Extract and validate WUA issuer
             String wuaIssuer = wuaClaims.getIssuer();
-            if (!walletProviderConfig.isTrustedIssuer(wuaIssuer)) {
-                logger.warn("⚠️Untrusted WUA issuer: {}", wuaIssuer);
-                return null;
+            if (walletProviderConfig.getTrustValidator().isEnabled()) {
+                List<com.nimbusds.jose.util.Base64> x5cChain = wuaJwt.getHeader().getX509CertChain();
+                if (x5cChain == null || x5cChain.isEmpty()) {
+                    logger.warn("⚠️WUA has no x5c chain, required when trust-validator is enabled");
+                    return null;
+                }
+                Optional<String> trustAnchor = trustValidatorClient.isTrusted(
+                        x5cChain, "WalletUnitAttestation", walletProviderConfig.getTrustValidator().getUrl());
+                if (trustAnchor.isEmpty()) {
+                    logger.warn("⚠️WUA chain not trusted by trust-validator (issuer={})", wuaIssuer);
+                    return null;
+                }
+                logger.info("WUA chain validated by trust-validator (anchor={})", trustAnchor.get());
+            } else {
+                if (!walletProviderConfig.isTrustedIssuer(wuaIssuer)) {
+                    logger.warn("⚠️Untrusted WUA issuer: {}", wuaIssuer);
+                    return null;
+                }
+                logger.debug("WUA issuer '{}' is trusted", wuaIssuer);
             }
-            logger.debug("WUA issuer '{}' is trusted", wuaIssuer);
 
             // 3. Derive JWKS URL from issuer and fetch Wallet Provider's public key
             String jwksUrl = wuaIssuer + "/.well-known/jwks.json";

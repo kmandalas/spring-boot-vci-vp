@@ -23,6 +23,13 @@ app:
     - http://${LOCAL_IP:localhost}:8080
   response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
   status-check-enabled: true
+  trust-validator:
+    enabled: true
+    url: http://localhost:8090
+    vct-to-context:
+      "urn:eu.europa.ec.eudi:pda1:1": PID
+      "urn:eudi:pid:1": PID
+    default-context: QEAA
 
 ---
 spring:
@@ -37,3 +44,10 @@ app:
     - https://vc-issuer.onrender.com
   response-uri: https://vp-verifier.onrender.com/verifier/verify-vp
   status-check-enabled: true
+  trust-validator:
+    enabled: false
+    url: http://localhost:8090
+    vct-to-context:
+      "urn:eu.europa.ec.eudi:pda1:1": PID
+      "urn:eudi:pid:1": PID
+    default-context: QEAA

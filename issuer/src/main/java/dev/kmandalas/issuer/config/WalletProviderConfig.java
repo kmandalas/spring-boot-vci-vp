@@ -42,6 +42,26 @@ public class WalletProviderConfig {
                 .anyMatch(trusted -> issuer.equals(trusted) || issuer.startsWith(trusted));
     }
 
+    private TrustValidatorConfig trustValidator = new TrustValidatorConfig();
+
+    public TrustValidatorConfig getTrustValidator() {
+        return trustValidator;
+    }
+
+    public void setTrustValidator(TrustValidatorConfig trustValidator) {
+        this.trustValidator = trustValidator;
+    }
+
+    public static class TrustValidatorConfig {
+        private boolean enabled = false;
+        private String url;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+    }
+
     /**
      * Check if a WSCD type is allowed based on configuration.
      * @param wscdType the storage type from WUA (e.g., "software", "tee", "strongbox")
