@@ -10,6 +10,8 @@ import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
@@ -18,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@RestController
+@Controller
 @RequestMapping("/verifier")
 public class VerifierController {
 
@@ -40,7 +42,16 @@ public class VerifierController {
     }
 
     /**
-     * Generates an HTML page with QR code and deep links to invoke a wallet for credential presentation.
+     * Renders the verifier selection page.
+     */
+    @GetMapping({"/select", "/invoke-wallet"})
+    public String selectPage() {
+        return "verifier";
+    }
+
+    /**
+     * HTMX endpoint — creates a presentation request and returns the QR/deep-link fragment.
+     * Only called when the user explicitly clicks "Request Presentation" (lazy creation).
      *
      * <p>This endpoint initiates the OpenID4VP (Verifiable Presentation) flow by:
      * <ol>
@@ -48,279 +59,71 @@ public class VerifierController {
      *   <li>Generating an ephemeral encryption key pair for VP response encryption</li>
      *   <li>Creating a signed JWT Authorization Request (JAR) with x5c certificate chain</li>
      *   <li>Storing the request for later retrieval by the wallet</li>
-     *   <li>Returning an HTML page with QR code and deep links (haip-vp:// and openid4vp://)</li>
+     *   <li>Returning an HTMX fragment with QR code and deep links (haip-vp:// and openid4vp://)</li>
      * </ol>
      *
      * <p>The wallet retrieves the signed authorization request via {@code /request-object/{requestId}},
      * verifies the JAR signature using the x5c certificate, and submits the encrypted VP response
      * to {@code /verify-vp/{requestId}}.
      *
-     * @return HTML page containing QR code and wallet invocation links
+     * @param format the credential format ({@code dc+sd-jwt} or {@code mso_mdoc})
+     * @param model  the Thymeleaf model for the QR fragment
+     * @return the {@code fragments/qr-fragment} template name
      * @see #getRequestObject(String) for JAR retrieval
      * @see #verifyVP(String, String) for VP token verification
      */
-    @GetMapping("/invoke-wallet")
-    public ResponseEntity<String> invokeWalletPage() {
-        try {
-            // DCQL query for PDA1 credential
-            Map<String, Object> dcqlQuery = Map.of(
-                    "credentials", List.of(
-                            Map.of(
-                                    "id", "pda1_credential",
-                                    "format", CredentialFormat.DC_SD_JWT.value(),
-                                    "meta", Map.of(
-                                            "vct_values", List.of("urn:eu.europa.ec.eudi:pda1:1")
-                                    ),
-                                    "claims", List.of(
-                                            Map.of("path", List.of("credential_holder")),
-                                            Map.of("path", List.of("competent_institution"))
-                                    )
-                            )
-                    )
-            );
-
-            // Base client metadata (encryption params added by service)
-            Map<String, Object> clientMetadata = Map.of(
-                    "client_name", "Demo Verifier Inc.",
-                    "logo_uri", "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120",
-                    "purpose", "Verify your Portable Document A1 credentials"
-            );
-
-            // Generate requestId upfront so we can include it in response_uri
-            String requestId = UUID.randomUUID().toString();
-            String responseUriWithId = appConfig.getResponseUri() + "/" + requestId;
-
-            // Create presentation request (generates ephemeral encryption key + signs as JAR)
-            presentationRequestService.createPresentationRequest(
-                    requestId,
-                    responseUriWithId,
-                    dcqlQuery,
-                    clientMetadata
-            );
-
-            // Build request URI for wallet to fetch signed authorization request
-            String requestUri = appConfig.getRequestUriStore() + requestId;
-
-            // Get x509_hash client_id from the signing service
-            String clientId = presentationRequestService.getClientId();
-
-            // Generate deep links for both schemes (HAIP and OpenID4VP)
-            String queryParams = "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
-                    + "&request_uri=" + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
-            String haipDeepLink = "haip-vp://" + queryParams;
-            String openid4vpDeepLink = "openid4vp://" + queryParams;
-
-            // Return an HTML page with QR code (HAIP) & both deep link buttons
-            return ResponseEntity.ok("""
-                <html>
-                <head>
-                    <title>K-Wallet VCI-VP demo</title>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-                    <style>
-                        body {
-                            text-align: center;
-                            font-family: Arial, sans-serif;
-                        }
-                        #qrcode {
-                            display: flex;
-                            justify-content: center;
-                            margin: 20px auto;
-                        }
-                        .wallet-link {
-                            display: inline-block;
-                            padding: 10px 20px;
-                            margin: 5px;
-                            background-color: #007bff;
-                            color: white;
-                            text-decoration: none;
-                            border-radius: 5px;
-                            font-size: 16px;
-                        }
-                        .wallet-link:hover {
-                            background-color: #0056b3;
-                        }
-                        .wallet-link.haip {
-                            background-color: #28a745;
-                        }
-                        .wallet-link.haip:hover {
-                            background-color: #1e7e34;
-                        }
-                        .scheme-label {
-                            font-size: 12px;
-                            color: #666;
-                            margin-top: 10px;
-                        }
-                        .format-badge {
-                            background-color: #28a745;
-                            color: white;
-                            padding: 5px 10px;
-                            border-radius: 3px;
-                            font-size: 12px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h2>K-Wallet VCI-VP demo <span class="format-badge">SD-JWT</span></h2>
-                    <p>Scan the QR code below with your phone</p>
-                    <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
-                    <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (sd-jwt)</p>
-                    <div id="qrcode"></div>
-                    <p>- OR -</p>
-                    <a href="%s" class="wallet-link haip">HAIP WALLET</a>
-                    <a href="%s" class="wallet-link">OpenID4VP WALLET</a>
-                    <script>
-                        const deepLink = "%s";
-                        new QRCode(document.getElementById("qrcode"), {
-                            text: deepLink,
-                            width: 256,
-                            height: 256,
-                            correctLevel: QRCode.CorrectLevel.L
-                        });
-                    </script>
-                </body>
-                </html>
-                """.formatted(haipDeepLink, openid4vpDeepLink, haipDeepLink));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error generating wallet page: " + e.getMessage());
+    @GetMapping("/qr-fragment")
+    public String qrFragment(@RequestParam(defaultValue = "dc+sd-jwt") String format, Model model) throws Exception {
+        CredentialFormat credentialFormat = CredentialFormat.fromValue(format);
+        if (credentialFormat == null) {
+            credentialFormat = CredentialFormat.DC_SD_JWT;
         }
-    }
 
-    /**
-     * Generates an HTML page for mDoc credential presentation.
-     * Similar to invoke-wallet but uses mDoc DCQL format.
-     */
-    @GetMapping("/invoke-wallet-mdoc")
-    public ResponseEntity<String> invokeWalletPageMDoc() {
-        try {
-            // DCQL query for mDoc PDA1 credential
-            Map<String, Object> dcqlQuery = Map.of(
-                    "credentials", List.of(
-                            Map.of(
-                                    "id", "pda1_mdoc",
-                                    "format", CredentialFormat.MSO_MDOC.value(),
-                                    "meta", Map.of(
-                                            "doctype_value", "eu.europa.ec.eudi.pda1.1"
-                                    ),
-                                    "claims", List.of(
-                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "credential_holder"), "intent_to_retain", false),
-                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "competent_institution"), "intent_to_retain", false)
-                                    )
-                            )
-                    )
-            );
+        Map<String, Object> dcqlQuery = buildDcqlQuery(credentialFormat);
 
-            // Base client metadata (encryption params added by service)
-            Map<String, Object> clientMetadata = Map.of(
-                    "client_name", "Demo Verifier Inc.",
-                    "logo_uri", "https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120",
-                    "purpose", "Verify your Portable Document A1 (mDoc) credentials"
-            );
-
-            // Generate requestId upfront so we can include it in response_uri
-            String requestId = UUID.randomUUID().toString();
-            String responseUriWithId = appConfig.getResponseUri() + "/" + requestId;
-
-            // Create presentation request (generates ephemeral encryption key + signs as JAR)
-            presentationRequestService.createPresentationRequest(
-                    requestId,
-                    responseUriWithId,
-                    dcqlQuery,
-                    clientMetadata
-            );
-
-            // Build request URI for wallet to fetch signed authorization request
-            String requestUri = appConfig.getRequestUriStore() + requestId;
-
-            // Get x509_hash client_id from the signing service
-            String clientId = presentationRequestService.getClientId();
-
-            // Generate deep links for both schemes (HAIP and OpenID4VP)
-            String queryParams = "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
-                    + "&request_uri=" + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
-            String haipDeepLink = "haip-vp://" + queryParams;
-            String openid4vpDeepLink = "openid4vp://" + queryParams;
-
-            // Return an HTML page with QR code (HAIP) & both deep link buttons
-            return ResponseEntity.ok("""
-                <html>
-                <head>
-                    <title>K-Wallet VCI-VP demo (mDoc)</title>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-                    <style>
-                        body {
-                            text-align: center;
-                            font-family: Arial, sans-serif;
-                        }
-                        #qrcode {
-                            display: flex;
-                            justify-content: center;
-                            margin: 20px auto;
-                        }
-                        .wallet-link {
-                            display: inline-block;
-                            padding: 10px 20px;
-                            margin: 5px;
-                            background-color: #007bff;
-                            color: white;
-                            text-decoration: none;
-                            border-radius: 5px;
-                            font-size: 16px;
-                        }
-                        .wallet-link:hover {
-                            background-color: #0056b3;
-                        }
-                        .wallet-link.haip {
-                            background-color: #28a745;
-                        }
-                        .wallet-link.haip:hover {
-                            background-color: #1e7e34;
-                        }
-                        .scheme-label {
-                            font-size: 12px;
-                            color: #666;
-                            margin-top: 10px;
-                        }
-                        .format-badge {
-                            background-color: #6f42c1;
-                            color: white;
-                            padding: 5px 10px;
-                            border-radius: 3px;
-                            font-size: 12px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h2>K-Wallet VCI-VP demo <span class="format-badge">mDoc</span></h2>
-                    <p>Scan the QR code below with your phone</p>
-                    <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
-                    <p class="scheme-label">Requesting: <code>eu.europa.ec.eudi.pda1.1</code> (mso_mdoc)</p>
-                    <div id="qrcode"></div>
-                    <p>- OR -</p>
-                    <a href="%s" class="wallet-link haip">HAIP WALLET</a>
-                    <a href="%s" class="wallet-link">OpenID4VP WALLET</a>
-                    <script>
-                        const deepLink = "%s";
-                        new QRCode(document.getElementById("qrcode"), {
-                            text: deepLink,
-                            width: 256,
-                            height: 256,
-                            correctLevel: QRCode.CorrectLevel.L
-                        });
-                    </script>
-                </body>
-                </html>
-                """.formatted(haipDeepLink, openid4vpDeepLink, haipDeepLink));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error generating wallet page: " + e.getMessage());
+        var meta = appConfig.getClientMetadata();
+        String purposeSuffix = credentialFormat == CredentialFormat.MSO_MDOC ? " (mDoc)" : "";
+        Map<String, Object> clientMetadata = new java.util.LinkedHashMap<>();
+        clientMetadata.put("client_name", meta.getClientName());
+        if (meta.getLogoUri() != null) {
+            clientMetadata.put("logo_uri", meta.getLogoUri());
         }
+        clientMetadata.put("purpose", meta.getPurpose() + purposeSuffix);
+
+        String requestId = UUID.randomUUID().toString();
+        String responseUriWithId = appConfig.getResponseUri() + "/" + requestId;
+
+        presentationRequestService.createPresentationRequest(
+                requestId, responseUriWithId, dcqlQuery, clientMetadata
+        );
+
+        String requestUri = appConfig.getRequestUriStore() + requestId;
+        String clientId = presentationRequestService.getClientId();
+
+        String queryParams = "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                + "&request_uri=" + URLEncoder.encode(requestUri, StandardCharsets.UTF_8);
+        String haipDeepLink = "haip-vp://" + queryParams;
+        String openid4vpDeepLink = "openid4vp://" + queryParams;
+
+        boolean isMdoc = credentialFormat == CredentialFormat.MSO_MDOC;
+        model.addAttribute("haipDeepLink", haipDeepLink);
+        model.addAttribute("openid4vpDeepLink", openid4vpDeepLink);
+        model.addAttribute("formatLabel", isMdoc ? "mDoc" : "SD-JWT");
+        model.addAttribute("formatBadgeClass", isMdoc ? "format-badge-mdoc" : "format-badge-sdjwt");
+        model.addAttribute("formatValue", credentialFormat.value());
+        model.addAttribute("credentialDoctype", "eu.europa.ec.eudi.pda1.1");
+        model.addAttribute("requestId", requestId);
+
+        logger.info("Created presentation request {} for format {}", requestId, credentialFormat.value());
+
+        return "fragments/qr-fragment";
     }
 
     /**
      * Serves the signed Authorization Request Object as JWT (JAR).
      * Content-Type: application/oauth-authz-req+jwt
      */
+    @ResponseBody
     @GetMapping(value = "/request-object/{requestId}", produces = "application/oauth-authz-req+jwt")
     public ResponseEntity<String> getRequestObject(@PathVariable String requestId) {
         String signedJwt = presentationRequestService.getAuthorizationRequest(requestId);
@@ -335,21 +138,19 @@ public class VerifierController {
      * The requestId in the path identifies which ephemeral key to use for decryption.
      * Accepts application/x-www-form-urlencoded as per OpenID4VP spec.
      */
+    @ResponseBody
     @PostMapping(value = "/verify-vp/{requestId}", consumes = "application/x-www-form-urlencoded")
     public ResponseEntity<String> verifyVP(@PathVariable String requestId,
                                            @RequestParam(value = "response", required = false) String encryptedResponse) {
         try {
             if (encryptedResponse == null || encryptedResponse.isEmpty()) {
-                return ResponseEntity.badRequest().body("❌ No encrypted response provided.");
+                return ResponseEntity.badRequest().body("No encrypted response provided.");
             }
 
-            // Decrypt the JWE response
             String decryptedPayload = presentationRequestService.decryptVpResponse(requestId, encryptedResponse);
 
-            // Parse the decrypted payload to extract vp_token
             Map<String, Object> responsePayload = objectMapper.readValue(decryptedPayload, new TypeReference<>() {});
 
-            // State is optional - log if present but don't validate
             Object state = responsePayload.get("state");
             if (state != null) {
                 logger.debug("Received state: {}", state);
@@ -358,31 +159,92 @@ public class VerifierController {
             String vpToken = vpValidationService.extractVpToken(responsePayload.get("vp_token"));
 
             if (vpToken == null) {
-                return ResponseEntity.badRequest().body("❌ No vp_token in decrypted response.");
+                return ResponseEntity.badRequest().body("No vp_token in decrypted response.");
             }
 
-            // Get stored request for format validation and mDoc DeviceAuth context
             PresentationRequest request = presentationRequestService.getRequest(requestId);
 
-            // Validate VP and extract claims (request provides expected format + DeviceAuth context for mDoc)
             VpValidationService.ValidationResult result = vpValidationService.validateAndExtract(vpToken, request);
 
-            // Cleanup the request after processing
+            // Store result for UI polling before cleanup
+            presentationRequestService.storeResult(requestId, result);
             presentationRequestService.removeRequest(requestId);
 
             if (result.valid()) {
                 String claimsJson = objectMapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(result.disclosedClaims());
                 logger.info("VP verified - issuer='{}', disclosed claims:\n{}", result.issuer(), claimsJson);
-                return ResponseEntity.ok("✅ VP Token is valid!");
+                return ResponseEntity.ok("VP Token is valid!");
             } else {
-                return ResponseEntity.badRequest().body("❌ VP Token validation failed: " + result.error());
+                return ResponseEntity.badRequest().body("VP Token validation failed: " + result.error());
             }
 
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("❌ Error during VP verification: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error during VP verification: " + e.getMessage());
         }
     }
 
-}
+    /**
+     * HTMX polling endpoint — returns the VP verification result when available.
+     * Returns 204 (no content) while waiting; HTMX keeps polling.
+     * Returns the result fragment when available; polling stops because the replacement has no trigger.
+     */
+    @GetMapping("/result/{requestId}")
+    public Object vpResult(@PathVariable String requestId, Model model) {
+        VpValidationService.ValidationResult result = presentationRequestService.getResult(requestId);
+        if (result == null) {
+            return ResponseEntity.noContent().build();
+        }
 
+        model.addAttribute("valid", result.valid());
+        model.addAttribute("issuer", result.issuer());
+        model.addAttribute("error", result.error());
+
+        if (result.disclosedClaims() != null) {
+            try {
+                model.addAttribute("claimsJson", objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(result.disclosedClaims()));
+            } catch (Exception e) {
+                model.addAttribute("claimsJson", result.disclosedClaims().toString());
+            }
+        }
+
+        return "fragments/result-fragment";
+    }
+
+    private Map<String, Object> buildDcqlQuery(CredentialFormat format) {
+        if (format == CredentialFormat.MSO_MDOC) {
+            return Map.of(
+                    "credentials", List.of(
+                            Map.of(
+                                    "id", "pda1_mdoc",
+                                    "format", CredentialFormat.MSO_MDOC.value(),
+                                    "meta", Map.of(
+                                            "doctype_value", "eu.europa.ec.eudi.pda1.1"
+                                    ),
+                                    "claims", List.of(
+                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "credential_holder"), "intent_to_retain", false),
+                                            Map.of("path", List.of("eu.europa.ec.eudi.pda1.1", "competent_institution"), "intent_to_retain", false)
+                                    )
+                            )
+                    )
+            );
+        }
+        return Map.of(
+                "credentials", List.of(
+                        Map.of(
+                                "id", "pda1_credential",
+                                "format", CredentialFormat.DC_SD_JWT.value(),
+                                "meta", Map.of(
+                                        "vct_values", List.of("urn:eu.europa.ec.eudi:pda1:1")
+                                ),
+                                "claims", List.of(
+                                        Map.of("path", List.of("credential_holder")),
+                                        Map.of("path", List.of("competent_institution"))
+                                )
+                        )
+                )
+        );
+    }
+
+}

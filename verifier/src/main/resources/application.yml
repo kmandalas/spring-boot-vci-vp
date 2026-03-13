@@ -23,6 +23,10 @@ app:
     - http://${LOCAL_IP:localhost}:8080
   response-uri: http://${LOCAL_IP:localhost}:9002/verifier/verify-vp
   status-check-enabled: true
+  client-metadata:
+    client-name: Demo Verifier Inc.
+    logo-uri: https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120
+    purpose: Verify your Portable Document A1 credentials
   trust-validator:
     enabled: true
     url: http://localhost:8090

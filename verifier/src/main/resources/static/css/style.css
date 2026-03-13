@@ -1,0 +1,258 @@
+:root {
+    --kw-dark-blue: #1B3A5C;
+    --kw-green: #2E6B3A;
+    --kw-green-hover: #245530;
+    --kw-green-light: #e8f5e9;
+    --kw-blue-light: #e3edf7;
+    --kw-border: #d0dbe6;
+    --kw-bg: #f4f7fa;
+    --kw-purple: #6f42c1;
+    --kw-purple-hover: #5a32a3;
+}
+
+body {
+    background-color: var(--kw-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #333;
+}
+
+/* Header */
+.kw-header {
+    background: linear-gradient(135deg, var(--kw-dark-blue) 0%, #2a5280 100%);
+    color: #fff;
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+}
+
+.kw-header .kw-logo {
+    height: 56px;
+    width: auto;
+}
+
+.kw-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.kw-header .kw-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+/* Card */
+.kw-card {
+    background: #fff;
+    border: 1px solid var(--kw-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(27, 58, 92, 0.08);
+    padding: 2rem;
+}
+
+.kw-card .form-label {
+    font-weight: 600;
+    color: var(--kw-dark-blue);
+}
+
+.kw-card .form-select:focus,
+.kw-card .form-control:focus {
+    border-color: var(--kw-green);
+    box-shadow: 0 0 0 0.2rem rgba(46, 107, 58, 0.15);
+}
+
+.kw-card .form-select {
+    border-color: var(--kw-border);
+}
+
+/* Buttons */
+.btn-kw-primary {
+    background-color: var(--kw-green);
+    border-color: var(--kw-green);
+    color: #fff;
+}
+
+.btn-kw-primary:hover,
+.btn-kw-primary:focus {
+    background-color: var(--kw-green-hover);
+    border-color: var(--kw-green-hover);
+    color: #fff;
+}
+
+.btn-kw-primary:disabled {
+    background-color: var(--kw-green);
+    border-color: var(--kw-green);
+    opacity: 0.65;
+}
+
+/* Format badges */
+.format-badge {
+    display: inline-block;
+    padding: 0.3em 0.7em;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.format-badge-sdjwt {
+    background-color: var(--kw-green);
+}
+
+.format-badge-mdoc {
+    background-color: var(--kw-purple);
+}
+
+/* Radio group */
+.kw-radio-group {
+    display: flex;
+    gap: 1rem;
+}
+
+.kw-radio-group .form-check {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--kw-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.kw-radio-group .form-check:has(input:checked) {
+    border-color: var(--kw-green);
+    background-color: var(--kw-green-light);
+}
+
+/* QR result section */
+.kw-qr-card {
+    background: #fff;
+    border: 1px solid var(--kw-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(27, 58, 92, 0.08);
+    padding: 2rem;
+    text-align: center;
+}
+
+.kw-qr-card #qrcode {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem auto;
+}
+
+/* Deep-link buttons */
+.wallet-link {
+    display: inline-block;
+    padding: 0.6rem 1.5rem;
+    margin: 0.3rem;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background-color 0.15s;
+}
+
+.wallet-link:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
+.wallet-link.haip {
+    background-color: var(--kw-green);
+}
+
+.wallet-link.haip:hover {
+    background-color: var(--kw-green-hover);
+}
+
+.wallet-link.openid {
+    background-color: var(--kw-dark-blue);
+}
+
+.wallet-link.openid:hover {
+    background-color: #15304d;
+}
+
+.scheme-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* HTMX loading indicator */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator {
+    display: inline-block;
+}
+
+.htmx-request .htmx-hide-on-request {
+    display: none;
+}
+
+/* VP Result cards */
+.kw-result-card {
+    border-radius: 10px;
+    border: 1px solid var(--kw-border);
+    overflow: hidden;
+    text-align: left;
+}
+
+.kw-result-header {
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.kw-result-success .kw-result-header {
+    background-color: var(--kw-green);
+}
+
+.kw-result-error .kw-result-header {
+    background-color: #c0392b;
+}
+
+.kw-result-icon {
+    margin-right: 0.4rem;
+}
+
+.kw-result-body {
+    padding: 1.25rem;
+    background: #fff;
+}
+
+.kw-result-issuer {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 1rem;
+}
+
+.kw-claims-pre {
+    background: #f8f9fa;
+    border: 1px solid var(--kw-border);
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 0.85rem;
+    max-height: 400px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Footer */
+.kw-footer {
+    text-align: center;
+    color: #999;
+    font-size: 0.8rem;
+    padding: 1.5rem 0 1rem;
+}
+
+.kw-footer a {
+    color: var(--kw-dark-blue);
+    text-decoration: none;
+}
+
+.kw-footer a:hover {
+    text-decoration: underline;
+}

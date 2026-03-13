@@ -42,6 +42,27 @@
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- WebJars for UI -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>webjars-locator-lite</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>bootstrap</artifactId>
+            <version>5.3.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>htmx.org</artifactId>
+            <version>2.0.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
@@ -66,6 +87,8 @@
                         <buildArg>-H:IncludeResources=.*\.json$</buildArg>
                         <buildArg>-H:IncludeResources=.*\.pem$</buildArg>
                         <buildArg>-H:IncludeResources=.*\.yml$</buildArg>
+                        <buildArg>-H:IncludeResources=templates/.*\.html$</buildArg>
+                        <buildArg>-H:IncludeResources=static/.*</buildArg>
                     </buildArgs>
                 </configuration>
             </plugin>

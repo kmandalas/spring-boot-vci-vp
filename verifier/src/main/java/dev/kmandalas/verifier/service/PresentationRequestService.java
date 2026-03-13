@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PresentationRequestService {
 
     private final Map<String, PresentationRequest> requestStore = new ConcurrentHashMap<>();
+    private final Map<String, VpValidationService.ValidationResult> resultStore = new ConcurrentHashMap<>();
     private final JarSigningService jarSigningService;
 
     public PresentationRequestService(JarSigningService jarSigningService) {
@@ -143,6 +144,20 @@ public class PresentationRequestService {
         jweObject.decrypt(decrypter);
 
         return jweObject.getPayload().toString();
+    }
+
+    /**
+     * Stores a VP validation result for polling retrieval.
+     */
+    public void storeResult(String requestId, VpValidationService.ValidationResult result) {
+        resultStore.put(requestId, result);
+    }
+
+    /**
+     * Retrieves and removes a stored VP validation result.
+     */
+    public VpValidationService.ValidationResult getResult(String requestId) {
+        return resultStore.remove(requestId);
     }
 
     /**

@@ -73,6 +73,16 @@ public class AppConfig {
         this.statusCheckEnabled = statusCheckEnabled;
     }
 
+    private ClientMetadata clientMetadata = new ClientMetadata();
+
+    public ClientMetadata getClientMetadata() {
+        return clientMetadata;
+    }
+
+    public void setClientMetadata(ClientMetadata clientMetadata) {
+        this.clientMetadata = clientMetadata;
+    }
+
     private TrustValidatorConfig trustValidator = new TrustValidatorConfig();
 
     public TrustValidatorConfig getTrustValidator() {
@@ -81,6 +91,19 @@ public class AppConfig {
 
     public void setTrustValidator(TrustValidatorConfig trustValidator) {
         this.trustValidator = trustValidator;
+    }
+
+    public static class ClientMetadata {
+        private String clientName = "Demo Verifier Inc.";
+        private String logoUri;
+        private String purpose = "Verify your Portable Document A1 credentials";
+
+        public String getClientName() { return clientName; }
+        public void setClientName(String clientName) { this.clientName = clientName; }
+        public String getLogoUri() { return logoUri; }
+        public void setLogoUri(String logoUri) { this.logoUri = logoUri; }
+        public String getPurpose() { return purpose; }
+        public void setPurpose(String purpose) { this.purpose = purpose; }
     }
 
     public static class TrustValidatorConfig {

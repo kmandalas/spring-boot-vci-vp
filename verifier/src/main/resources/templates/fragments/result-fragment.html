@@ -1,0 +1,27 @@
+<div id="vp-result" xmlns:th="http://www.thymeleaf.org">
+
+    <!-- Success -->
+    <div th:if="${valid}" class="kw-result-card kw-result-success mt-4">
+        <div class="kw-result-header">
+            <span class="kw-result-icon">&#10003;</span> Verification Successful
+        </div>
+        <div class="kw-result-body">
+            <p class="kw-result-issuer" th:if="${issuer}">
+                <strong>Issuer:</strong> <span th:text="${issuer}">—</span>
+            </p>
+            <h6>Disclosed Claims</h6>
+            <pre class="kw-claims-pre" th:text="${claimsJson}">{ }</pre>
+        </div>
+    </div>
+
+    <!-- Failure -->
+    <div th:unless="${valid}" class="kw-result-card kw-result-error mt-4">
+        <div class="kw-result-header">
+            <span class="kw-result-icon">&#10007;</span> Verification Failed
+        </div>
+        <div class="kw-result-body">
+            <p th:text="${error}">Unknown error</p>
+        </div>
+    </div>
+
+</div>
