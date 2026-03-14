@@ -102,9 +102,16 @@ Available [here](https://github.com/kmandalas/android-vci-vp) along with instruc
 
 ## VP
 
-### Same Device Flow (our demo)
+### Same Device & Cross Device Flow
 
-The verifier uses JWT-Secured Authorization Request (JAR) with x5c certificate chain for request authentication, and the wallet encrypts the VP response using ECDH-ES + A256GCM.
+The verifier web UI is available at `http://localhost:9002/verifier/select`. Select a credential format (SD-JWT or mDoc) and click **Request Presentation** to generate a QR code and deep links. Two flows are supported:
+
+- **Same-device**: Tap the `haip-vp://` or `openid4vp://` deep link to open the wallet directly on the same device.
+- **Cross-device**: Scan the QR code with the wallet app on another device.
+
+In both cases, the verifier signs the authorization request as a JAR (JWT with x5c header) and the wallet encrypts the VP response using ECDH-ES + A256GCM. The verifier UI polls for the result via HTMX and displays the disclosed claims inline once the wallet submits the VP.
+
+![verifier-ui.png](verifier-ui.png)
 
 ```
 sequenceDiagram
