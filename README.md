@@ -7,6 +7,29 @@ Related articles:
 - [HAIP 1.0: Securing Verifiable Presentations](https://dzone.com/articles/haip-1-0-securing-verifiable-presentations)
 - More articles covering WIA, WUA, and Token Status List coming soon.
 
+## OID4VCI Conformance
+
+<img src="openid.png" alt="OpenID" width="160"/>
+
+The [**auth-server**](./auth-server) + [**issuer**](./issuer) (acting as one OID4VCI Credential Issuer) and [**K-Wallet**](https://github.com/kmandalas/android-vci-vp) (Android) have successfully completed the [OpenID Foundation Conformance Suite](https://www.certification.openid.net/) self-assessment for **OID4VCI 1.0 Final**:
+
+| Role | Test | Result |
+|------|------|--------|
+| **Issuer** | `oid4vci-1_0-issuer-metadata-test` | PASSED |
+| **Issuer** | `oid4vci-1_0-issuer-happy-flow` | PASSED |
+| **Issuer** | `oid4vci-1_0-issuer-ensure-request-object-with-multiple-aud-succeeds` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path-with-scopes` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path-with-scopes-without-authorization-details-in-token-response` | PASSED |
+
+**Issuer profile** (Feb 2026): `client_attestation`, `dpop`, `wallet_initiated`, `simple`, `haip`, `unsigned`, `authorization_code`
+
+**Wallet profile** (Mar 2026): `dpop`, `client_attestation`, `wallet_initiated`, `simple`, `haip`, `unsigned`, `authorization_code`, `by_value`
+
+> **Note:** This is a self-assessment via the OpenID conformance suite — it validates protocol-level compliance (OID4VCI spec flows, token shapes, HAIP rules). It does not certify infrastructure security (HSMs, datacenter posture, LoA High hardware requirements, etc.).
+
+---
+
 ## Architecture
 
 The system consists of five independent Spring Boot applications:
@@ -96,7 +119,7 @@ Credentials can also be issued in `mso_mdoc` format (ISO 18013-5). The mDoc cred
 
 ## Demo wallet app (Android)
 
-Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions and [screen recordings](https://www.youtube.com/@kmandalas)
+Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions and [screen recordings](https://github.com/kmandalas/android-vci-vp#demo-video)
 
 ---
 
