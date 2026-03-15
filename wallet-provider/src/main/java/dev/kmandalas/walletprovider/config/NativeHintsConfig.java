@@ -34,6 +34,9 @@ public class NativeHintsConfig {
             hints.reflection().registerType(WuaCredentialRequest.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(WuaCredentialRequest.Proof.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(WuaCredentialRequest.KeyAttestation.class, ALL_MEMBER_CATEGORIES);
+            hints.reflection().registerType(WuaCredentialRequest.QtspCredentialInfo.class, ALL_MEMBER_CATEGORIES);
+            hints.reflection().registerType(WuaCredentialRequest.QtspCredentialInfo.KeyInfo.class, ALL_MEMBER_CATEGORIES);
+            hints.reflection().registerType(WuaCredentialRequest.QtspCredentialInfo.CertInfo.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(WiaCredentialRequest.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(WiaCredentialRequest.Proof.class, ALL_MEMBER_CATEGORIES);
         }

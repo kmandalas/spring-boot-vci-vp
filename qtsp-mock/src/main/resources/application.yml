@@ -1,0 +1,27 @@
+server:
+  port: 9003
+
+spring:
+  application:
+    name: qtsp-mock
+
+  ssl:
+    bundle:
+      pem:
+        qtsp-ca:
+          keystore:
+            certificate: classpath:qtsp_ca_cert.pem
+            private-key: classpath:qtsp_ca_key.pem
+
+qtsp:
+  api-key: qtsp-demo-api-key
+  sad-ttl-seconds: 300
+
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+
+qtsp:
+  api-key: ${QTSP_API_KEY:qtsp-demo-api-key}

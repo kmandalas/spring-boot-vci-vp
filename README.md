@@ -32,15 +32,16 @@ The [**auth-server**](./auth-server) + [**issuer**](./issuer) (acting as one OID
 
 ## Architecture
 
-The system consists of five independent Spring Boot applications:
+The system consists of six independent Spring Boot applications, built with **Spring Boot 4.0.3**, **Java 25**, and **Spring Security 7**. All modules support **GraalVM Native Image** compilation.
 
 | Module | Port | Description |
 |--------|------|-------------|
 | **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
 | **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT and mDoc credentials with revocation support (publishes own Token Status List) |
 | **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, encrypted responses, and Token Status List revocation check |
-| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
-| **trust-validator** | 8090 | X.509 trust chain validation service — decouples certificate trust evaluation from individual services (local-dev only, see below) |
+| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA), with support for both local and remote WSCD attestation |
+| **trust-validator** | 8090 | X.509 trust chain validation service — decouples certificate trust evaluation from individual services (feature-flagged, see below) |
+| **qtsp-mock** | 9003 | Mock QTSP — CSC API v2 (ETSI TS 119 432) for remote WSCD key management |
 
 ## VCI
 
@@ -284,6 +285,8 @@ The wallet-provider module acts as the trust anchor for wallet instances and the
 
 **WUA (Wallet Unit Attestation)** — Issues `key-attestation+jwt` tokens after validating Android Key Attestation certificate chains against Google's root CA. The WUA captures the key's security level (software, TEE, or StrongBox) and maps it to ISO 18045 attack-potential resistance levels. The issuer checks the WUA before issuing credentials.
 
+**Remote WSCD (QTSP)** — The wallet-provider also supports remote WSCD attestation via `QtspAttestationService`. When a wallet uses a remote signing key managed by a QTSP (see qtsp-mock), the wallet-provider validates the QTSP certificate chain against the trust-validator, verifies SCAL=2 compliance, and issues a WUA with `wscd_type: "remote_qscd"`.
+
 **Token Status List** — Each WUA is assigned an index in a compressed bitstring published as a signed JWT (`application/statuslist+jwt`) per `draft-ietf-oauth-status-list`. The issuer fetches the status list and checks the relevant bit to determine whether a WUA has been revoked, providing a privacy-preserving revocation mechanism.
 
 ---
@@ -294,15 +297,40 @@ The trust-validator is a standalone X.509 trust chain validation service that an
 
 It decouples trust evaluation from individual services — the auth-server, issuer, and verifier each delegate chain validation via a simple `POST /trust` call instead of embedding their own trust logic. This means the trust infrastructure can be upgraded (e.g. to EU Lists of Trusted Lists) without touching service code.
 
-**Currently enabled for local development only.** Each consumer has a feature flag (`trust-validator.enabled`) that is `true` in the default profile and `false` in the cloud profile. When disabled, consumers fall back to their configured `trusted-issuers` lists.
+**Feature-flagged in all consumers.** Each consumer (auth-server, issuer, verifier, wallet-provider) has a `trust-validator.enabled` flag that defaults to `false`. When disabled, consumers fall back to their configured `trusted-issuers` lists.
 
 **Key capabilities:**
-- **14 EUDI ARF verification contexts** — `WalletInstanceAttestation`, `PID`, `QEAA`, `PubEAA`, `EAA`, and their status-list counterparts, plus `WalletRelyingPartyAccessCertificate` and `Custom`
+- **15 EUDI ARF verification contexts** — `WalletInstanceAttestation`, `PID`, `QEAA`, `PubEAA`, `EAA`, and their status-list counterparts, plus `WalletRelyingPartyAccessCertificate`, `QTSPSigningCertificate`, and `Custom`
 - **Two trust source modes** — local KeyStore (ships with project CA, works out of the box) or EU LoTL via DSS with scheduled refresh
 - **Browser UI** at `http://localhost:8090/validate` for manual certificate chain testing
 - **Consumer integration** — identical `TrustValidatorClient` in auth-server (WIA chain), issuer (WUA chain), and verifier (credential issuer chain)
 
 In a production deployment, this service would sit on an internal network — its security posture (mTLS, service mesh, network isolation) depends on the zero-trust model of the environment.
+
+---
+
+## QTSP Mock (Remote WSCD)
+
+The qtsp-mock module provides a mock Qualified Trust Service Provider implementing the **CSC API v2** (ETSI TS 119 432) for remote WSCD key management. It demonstrates how a wallet can use remotely-managed signing keys instead of device-local keys (Android Keystore).
+
+**CSC API endpoints:**
+- `POST /csc/v2/credentials/list` — List available signing credentials
+- `POST /csc/v2/credentials/info` — Get credential details (key algorithm, certificate chain, SCAL level)
+- `POST /csc/v2/credentials/authorize` — Obtain a single-use SAD (Signature Activation Data) token
+- `POST /csc/v2/signatures/signHash` — Sign a hash using the authorized credential
+
+**Key features:**
+- EC P-256 signing key generated on startup with a stable CA (ships with project)
+- Single-use SAD tokens for signature activation (SCAL=2)
+- Static API key authentication (`ApiKey` header)
+- Dashboard UI at `/dashboard` (Thymeleaf + HTMX) for testing CSC operations interactively
+
+**Integration with the ecosystem:**
+- **wallet-provider** — `QtspAttestationService` accepts `qtsp_attestation` type requests, validates the QTSP certificate chain against the trust-validator, verifies SCAL=2, and issues a WUA with `wscd_type: "remote_qscd"`
+- **trust-validator** — QTSP CA is included in `local-trust.jks`; chain validation uses the `QTSPSigningCertificate` verification context
+- **K-Wallet Android app** — Supports toggling between local (Android Keystore) and remote (QTSP) signing modes
+
+In production, the mock QTSP would be replaced by a certified QTSP's HSM-backed infrastructure. See [`qtsp-mock/notes/QTSP-REMOTE-QSCD.md`](./qtsp-mock/notes/QTSP-REMOTE-QSCD.md) for full details, diagrams, and spec compliance notes.
 
 ---
 
@@ -323,6 +351,7 @@ This implementation includes the following HAIP-compliant features:
 | **mso_mdoc** | ISO 18013-5 mDoc credential format with COSE_Sign1 IssuerAuth |
 | **VP Encryption** | Response encryption using ECDH-ES + A256GCM |
 | **haip-vp:// scheme** | HAIP-compliant URI scheme for wallet invocation |
+| **Remote WSCD** | CSC API v2 (ETSI TS 119 432) for remote WSCD key management via QTSP |
 
 ---
 
@@ -345,7 +374,7 @@ If you need a production-ready solution, I can deliver a complete, end-to-end EU
 #### Full-stack engagements
 
 - **HSM integration** — Hardware Security Module support for issuer and wallet-provider signing keys (LoA High compliance)
-- **Remote WSCA** — Remote Wallet Secure Cryptographic Application for hardware-backed key management without device dependency
+- **Remote WSCA** — Production-grade Remote Wallet Secure Cryptographic Application with certified QTSP HSM integration (the included qtsp-mock demonstrates the CSC API v2 flow end-to-end)
 - **Production-grade storage** — Replace H2 with a production database of your choice (PostgreSQL, MySQL, CosmosDB, etc.); credential status, WUA, and session data on a robust, scalable store
 - **Key Vault integration** — AWS KMS, Azure Key Vault, or HashiCorp Vault for secret/key lifecycle management
 - **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (e.g. Redis) for JTI replay protection, session management etc.

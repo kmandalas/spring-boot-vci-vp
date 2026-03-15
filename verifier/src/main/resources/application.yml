@@ -28,7 +28,7 @@ app:
     logo-uri: https://img.freepik.com/premium-vector/creative-logo-design-real-estate-company-vector-illustration_1253202-20005.jpg?semt=ais_hybrid&w=120
     purpose: Verify your Portable Document A1 credentials
   trust-validator:
-    enabled: true
+    enabled: false
     url: http://localhost:8090
     vct-to-context:
       "urn:eu.europa.ec.eudi:pda1:1": PID

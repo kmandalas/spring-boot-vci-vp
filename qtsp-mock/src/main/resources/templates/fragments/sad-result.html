@@ -1,0 +1,29 @@
+<div xmlns:th="http://www.thymeleaf.org">
+    <div class="sad-display mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong style="color: var(--kw-green);">SAD Issued</strong>
+            <span class="badge bg-success">Single-use</span>
+        </div>
+        <div class="sad-value" th:text="${sad}"></div>
+        <div class="mt-2" style="font-size: 0.8rem; color: #888;">
+            Expires in <span th:text="${ttl}"></span> seconds
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12">
+            <input type="hidden" name="credentialId" th:value="${credentialId}">
+            <input type="hidden" name="sad" th:value="${sad}">
+            <button class="btn btn-kw-sign"
+                    hx-post="/dashboard/sign"
+                    hx-include="[name='dataToSign'], [name='credentialId'], [name='sad']"
+                    hx-target="#sign-result"
+                    hx-swap="innerHTML">
+                <span class="htmx-hide-on-request">Step 2: Sign Hash</span>
+                <span class="htmx-indicator">
+                    <span class="spinner-border spinner-border-sm me-1"></span>Signing...
+                </span>
+            </button>
+        </div>
+    </div>
+</div>

@@ -303,7 +303,7 @@ public class WalletAttestationAuthenticationProvider implements AuthenticationPr
                     // Validate chain via trust-validator (replaces string-based issuer check)
                     List<com.nimbusds.jose.util.Base64> x5cChain = wiaJwt.getHeader().getX509CertChain();
                     Optional<String> trustAnchor = trustValidatorClient.isTrusted(
-                            x5cChain, "WalletInstanceAttestation", properties.getTrustValidator().getUrl());
+                            x5cChain, "WalletInstanceAttestation");
                     if (trustAnchor.isEmpty()) {
                         throw authException("invalid_client", "WIA chain not trusted by trust-validator");
                     }

@@ -26,6 +26,12 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+        <!-- RestClient for trust-validator calls -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
         <!-- Security (for future public/protected endpoint config) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

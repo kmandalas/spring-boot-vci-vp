@@ -1,0 +1,240 @@
+:root {
+    --kw-dark-blue: #1B3A5C;
+    --kw-green: #2E6B3A;
+    --kw-green-hover: #245530;
+    --kw-green-light: #e8f5e9;
+    --kw-blue-light: #e3edf7;
+    --kw-border: #d0dbe6;
+    --kw-bg: #f4f7fa;
+    --kw-purple: #6f42c1;
+    --kw-orange: #e67e22;
+    --kw-orange-hover: #d35400;
+}
+
+body {
+    background-color: var(--kw-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #333;
+}
+
+/* Header */
+.kw-header {
+    background: linear-gradient(135deg, var(--kw-dark-blue) 0%, #2a5280 100%);
+    color: #fff;
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+}
+
+.kw-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.kw-header .kw-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+/* Cards */
+.kw-card {
+    background: #fff;
+    border: 1px solid var(--kw-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(27, 58, 92, 0.08);
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.kw-card h5 {
+    color: var(--kw-dark-blue);
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+/* Info grid */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.info-item {
+    background: var(--kw-bg);
+    border: 1px solid var(--kw-border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.info-item .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 0.25rem;
+}
+
+.info-item .value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--kw-dark-blue);
+    word-break: break-all;
+}
+
+/* Credential card */
+.credential-card {
+    border-left: 4px solid var(--kw-green);
+}
+
+/* Badges */
+.badge-scal {
+    background-color: var(--kw-green);
+    color: #fff;
+    padding: 0.3em 0.7em;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-hsm {
+    background-color: var(--kw-purple);
+    color: #fff;
+    padding: 0.3em 0.7em;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-ec {
+    background-color: var(--kw-dark-blue);
+    color: #fff;
+    padding: 0.3em 0.7em;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn-kw-primary {
+    background-color: var(--kw-green);
+    border-color: var(--kw-green);
+    color: #fff;
+}
+
+.btn-kw-primary:hover,
+.btn-kw-primary:focus {
+    background-color: var(--kw-green-hover);
+    border-color: var(--kw-green-hover);
+    color: #fff;
+}
+
+.btn-kw-sign {
+    background-color: var(--kw-orange);
+    border-color: var(--kw-orange);
+    color: #fff;
+}
+
+.btn-kw-sign:hover,
+.btn-kw-sign:focus {
+    background-color: var(--kw-orange-hover);
+    border-color: var(--kw-orange-hover);
+    color: #fff;
+}
+
+/* SAD display */
+.sad-display {
+    background: var(--kw-green-light);
+    border: 1px solid var(--kw-green);
+    border-radius: 8px;
+    padding: 1.25rem;
+}
+
+.sad-value {
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--kw-green);
+    word-break: break-all;
+}
+
+/* Signature result */
+.result-success {
+    background: var(--kw-green-light);
+    border: 1px solid var(--kw-green);
+    border-radius: 8px;
+    padding: 1.25rem;
+}
+
+.result-error {
+    background: #fdecea;
+    border: 1px solid #c0392b;
+    border-radius: 8px;
+    padding: 1.25rem;
+}
+
+.result-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 0.25rem;
+    margin-top: 0.75rem;
+}
+
+.result-value {
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+/* HTMX loading */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator {
+    display: inline-block;
+}
+
+.htmx-request .htmx-hide-on-request {
+    display: none;
+}
+
+/* Flow steps */
+.flow-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-number {
+    background: var(--kw-dark-blue);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.step-text {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+/* Footer */
+.kw-footer {
+    text-align: center;
+    color: #999;
+    font-size: 0.8rem;
+    padding: 1.5rem 0 1rem;
+}

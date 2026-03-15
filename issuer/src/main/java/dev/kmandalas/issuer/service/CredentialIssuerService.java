@@ -237,7 +237,7 @@ public class CredentialIssuerService {
                     return null;
                 }
                 Optional<String> trustAnchor = trustValidatorClient.isTrusted(
-                        x5cChain, "WalletUnitAttestation", walletProviderConfig.getTrustValidator().getUrl());
+                        x5cChain, "WalletUnitAttestation");
                 if (trustAnchor.isEmpty()) {
                     logger.warn("⚠️WUA chain not trusted by trust-validator (issuer={})", wuaIssuer);
                     return null;

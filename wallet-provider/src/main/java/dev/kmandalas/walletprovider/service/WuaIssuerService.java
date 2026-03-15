@@ -38,15 +38,19 @@ public class WuaIssuerService {
     private final WpMetadataConfig wpMetadataConfig;
     private final WuaRepository wuaRepository;
     private final KeyAttestationService keyAttestationService;
+    private final QtspAttestationService qtspAttestationService;
     private final WpSigningService wpSigningService;
     private final StatusListIndexService statusListIndexService;
 
     public WuaIssuerService(WpMetadataConfig wpMetadataConfig, WuaRepository wuaRepository,
-                           KeyAttestationService keyAttestationService, WpSigningService wpSigningService,
+                           KeyAttestationService keyAttestationService,
+                           QtspAttestationService qtspAttestationService,
+                           WpSigningService wpSigningService,
                            StatusListIndexService statusListIndexService) {
         this.wpMetadataConfig = wpMetadataConfig;
         this.wuaRepository = wuaRepository;
         this.keyAttestationService = keyAttestationService;
+        this.qtspAttestationService = qtspAttestationService;
         this.wpSigningService = wpSigningService;
         this.statusListIndexService = statusListIndexService;
     }
@@ -76,18 +80,20 @@ public class WuaIssuerService {
             throw new CertificateException("Key attestation is required");
         }
 
-        if (!"android_key_attestation".equals(request.keyAttestation().attestationType())) {
-            throw new CertificateException("Unsupported attestation type: " +
-                    request.keyAttestation().attestationType());
-        }
+        String attestationType = request.keyAttestation().attestationType();
 
-        KeyAttestationData attestationData = keyAttestationService.validateAndExtract(
-                request.keyAttestation().certificateChain());
-
-        // Verify that the public key in the attestation matches the proof JWT's JWK
-        verifyKeyMatch(proofJwk, attestationData.walletPublicKey());
-
-        return attestationData;
+        return switch (attestationType) {
+            case "android_key_attestation" -> {
+                KeyAttestationData attestationData = keyAttestationService.validateAndExtract(
+                        request.keyAttestation().certificateChain());
+                // Verify that the public key in the attestation matches the proof JWT's JWK
+                verifyKeyMatch(proofJwk, attestationData.walletPublicKey());
+                yield attestationData;
+            }
+            case "qtsp_attestation" -> qtspAttestationService.validateAndExtract(
+                    request.keyAttestation().qtspCredentialInfo(), proofJwk);
+            default -> throw new CertificateException("Unsupported attestation type: " + attestationType);
+        };
     }
 
     public WuaIssuanceResult issueWua(JWK walletKey, KeyAttestationData attestationData)
@@ -166,8 +172,12 @@ public class WuaIssuerService {
         wscdCertInfo.put("security_level", attestationData.wscdSecurityLevel());
         wscdCertInfo.put("attestation_version", attestationData.attestationVersion());
 
+        // TS3: REMOTE, LOCAL_EXTERNAL, LOCAL_INTERNAL, LOCAL_NATIVE, HYBRID
+        String wscdTypeTs3 = KeyAttestationData.WSCD_TYPE_REMOTE_QSCD.equals(attestationData.wscdType())
+                ? "REMOTE" : "LOCAL_NATIVE";
+
         Map<String, Object> wscdInfo = new LinkedHashMap<>();
-        wscdInfo.put("wscd_type", "LOCAL_NATIVE");  // TS3: REMOTE, LOCAL_EXTERNAL, LOCAL_INTERNAL, LOCAL_NATIVE, HYBRID
+        wscdInfo.put("wscd_type", wscdTypeTs3);
         wscdInfo.put("wscd_certification_information", wscdCertInfo);
 
         // TS3 Section 2.3.4: eudi_wallet_info
@@ -216,8 +226,7 @@ public class WuaIssuerService {
             return "iso_18045_basic";
         }
         return switch (wscdType.toLowerCase()) {
-            case "strongbox" -> "iso_18045_high";
-            case "tee" -> "iso_18045_high";  // TEE also qualifies as high for WSCD
+            case "strongbox", "tee", "remote_qscd" -> "iso_18045_high";
             case "software" -> "iso_18045_basic";
             default -> "iso_18045_basic";
         };

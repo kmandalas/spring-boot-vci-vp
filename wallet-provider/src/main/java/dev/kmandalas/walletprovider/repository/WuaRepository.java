@@ -18,8 +18,9 @@ public class WuaRepository {
 
     public void save(WalletUnitAttestation wua) {
         jdbcClient.sql("""
-            INSERT INTO wallet_unit_attestations
+            MERGE INTO wallet_unit_attestations
             (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx)
+            KEY (wallet_public_key_thumbprint)
             VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt, :statusListId, :statusListIdx)
             """)
             .param("wuaId", wua.wuaId())

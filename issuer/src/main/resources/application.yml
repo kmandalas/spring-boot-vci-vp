@@ -46,7 +46,7 @@ app:
       - http://${LOCAL_IP:localhost}:9001/wp
     allowed-wscd-types: all  # Options: all, software, tee, strongbox (comma-separated)
     trust-validator:
-      enabled: true
+      enabled: false
       url: http://localhost:8090
 
 ---

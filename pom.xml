@@ -23,6 +23,7 @@
         <module>verifier</module>
         <module>wallet-provider</module>
         <module>trust-validator</module>
+        <module>qtsp-mock</module>
     </modules>
 
 </project>

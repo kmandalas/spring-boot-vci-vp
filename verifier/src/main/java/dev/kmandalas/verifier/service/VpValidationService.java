@@ -129,7 +129,7 @@ public class VpValidationService {
                 String context = appConfig.getTrustValidator().getVctToContext()
                         .getOrDefault(vct, appConfig.getTrustValidator().getDefaultContext());
                 Optional<String> trustAnchor = trustValidatorClient.isTrusted(
-                        x5cChain, context, appConfig.getTrustValidator().getUrl());
+                        x5cChain, context);
                 if (trustAnchor.isEmpty()) {
                     logger.warn("Credential chain not trusted by trust-validator (issuer={}, vct={})", issuer, vct);
                     return ValidationResult.failure("Credential chain not trusted by trust-validator");
@@ -214,7 +214,7 @@ public class VpValidationService {
                 }
                 String tvContext = appConfig.getTrustValidator().getDefaultContext();
                 Optional<String> trustAnchor = trustValidatorClient.isTrusted(
-                        x5cChain, tvContext, appConfig.getTrustValidator().getUrl());
+                        x5cChain, tvContext);
                 if (trustAnchor.isEmpty()) {
                     return ValidationResult.failure("mDoc chain not trusted by trust-validator");
                 }

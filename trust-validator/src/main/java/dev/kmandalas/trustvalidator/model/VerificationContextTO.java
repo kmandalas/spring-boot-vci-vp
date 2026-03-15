@@ -17,5 +17,6 @@ public enum VerificationContextTO {
     EAAStatus,
     WalletRelyingPartyRegistrationCertificate,
     WalletRelyingPartyAccessCertificate,
+    QTSPSigningCertificate,
     Custom
 }

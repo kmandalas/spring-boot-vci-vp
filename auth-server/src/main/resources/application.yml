@@ -21,7 +21,7 @@ app:
     max-pop-age-seconds: 300
     max-wia-age-seconds: 86400
     trust-validator:
-      enabled: true
+      enabled: false
       url: http://localhost:8090
   require-consent: true
   extra-redirect-uris: ""
