@@ -351,7 +351,7 @@ This implementation includes the following HAIP-compliant features:
 | **mso_mdoc** | ISO 18013-5 mDoc credential format with COSE_Sign1 IssuerAuth |
 | **VP Encryption** | Response encryption using ECDH-ES + A256GCM |
 | **haip-vp:// scheme** | HAIP-compliant URI scheme for wallet invocation |
-| **Remote WSCD** | CSC API v2 (ETSI TS 119 432) for remote WSCD key management via QTSP |
+| ⭐ **Remote WSCD** | CSC API v2 (ETSI TS 119 432) for remote WSCD key management via QTSP |
 
 ---
 
