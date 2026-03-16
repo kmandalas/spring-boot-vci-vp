@@ -1,5 +1,5 @@
-# Spring Boot SD-JWT & VCI/VP Demo
-Explore how SD-JWTs, OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
+# Spring Boot SD-JWT, mDoc & VCI/VP Demo
+Explore how SD-JWTs, mDoc (ISO 18013-5), OIDC4VCI, and OIDC4VP enable user-consented, selective disclosure of Verifiable Credentials using open standards in a demo setup. The project also implements wallet attestation (WIA/WUA), DPoP-bound tokens, and Token Status List revocation, following the [HAIP (High Assurance Interoperability Profile)](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html) specification and EUDI Architecture Reference Framework.
 
 Related articles:
 - [Verifiable Credentials with Spring Boot & Android](https://dzone.com/articles/verifiable-credentials-spring-boot-android)
@@ -7,16 +7,41 @@ Related articles:
 - [HAIP 1.0: Securing Verifiable Presentations](https://dzone.com/articles/haip-1-0-securing-verifiable-presentations)
 - More articles covering WIA, WUA, and Token Status List coming soon.
 
+## OID4VCI Conformance
+
+<img src="openid.png" alt="OpenID" width="160"/>
+
+The [**auth-server**](./auth-server) + [**issuer**](./issuer) (acting as one OID4VCI Credential Issuer) and [**K-Wallet**](https://github.com/kmandalas/android-vci-vp) (Android) have successfully completed the [OpenID Foundation Conformance Suite](https://www.certification.openid.net/) self-assessment for **OID4VCI 1.0 Final**:
+
+| Role | Test | Result |
+|------|------|--------|
+| **Issuer** | `oid4vci-1_0-issuer-metadata-test` | PASSED |
+| **Issuer** | `oid4vci-1_0-issuer-happy-flow` | PASSED |
+| **Issuer** | `oid4vci-1_0-issuer-ensure-request-object-with-multiple-aud-succeeds` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path-with-scopes` | PASSED |
+| **Wallet** | `oid4vci-1_0-wallet-happy-path-with-scopes-without-authorization-details-in-token-response` | PASSED |
+
+**Issuer profile** (Feb 2026): `client_attestation`, `dpop`, `wallet_initiated`, `simple`, `haip`, `unsigned`, `authorization_code`
+
+**Wallet profile** (Mar 2026): `dpop`, `client_attestation`, `wallet_initiated`, `simple`, `haip`, `unsigned`, `authorization_code`, `by_value`
+
+> **Note:** This is a self-assessment via the OpenID conformance suite — it validates protocol-level compliance (OID4VCI spec flows, token shapes, HAIP rules). It does not certify infrastructure security (HSMs, datacenter posture, LoA High hardware requirements, etc.).
+
+---
+
 ## Architecture
 
-The system consists of four independent Spring Boot applications:
+The system consists of six independent Spring Boot applications, built with **Spring Boot 4.0.3**, **Java 25**, and **Spring Security 7**. All modules support **GraalVM Native Image** compilation.
 
 | Module | Port | Description |
 |--------|------|-------------|
 | **auth-server** | 9000 | OAuth2 Authorization Server with PAR, DPoP, and WIA-based client authentication |
-| **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT credentials with revocation support (publishes own Token Status List) |
+| **issuer** | 8080 | Credential Issuer — validates WUA revocation via Token Status List, issues SD-JWT and mDoc credentials with revocation support (publishes own Token Status List) |
 | **verifier** | 9002 | Credential Verifier — HAIP-compliant VP flow with JAR, DCQL, encrypted responses, and Token Status List revocation check |
-| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA) |
+| **wallet-provider** | 9001 | Issues Wallet Instance Attestations (WIA) and Wallet Unit Attestations (WUA), with support for both local and remote WSCD attestation |
+| **trust-validator** | 8090 | X.509 trust chain validation service — decouples certificate trust evaluation from individual services (feature-flagged, see below) |
+| **qtsp-mock** | 9003 | Mock QTSP — CSC API v2 (ETSI TS 119 432) for remote WSCD key management |
 
 ## VCI
 
@@ -56,8 +81,8 @@ sequenceDiagram
     Issuer->>AuthenticSource: Retrieve user credentials
     AuthenticSource-->>Issuer: Return credentials
     Issuer->>Issuer: Allocate Token Status List index
-    Issuer->>Issuer: Prepare SD-JWT with x5c header and status claim
-    Issuer-->>WalletApp: Return SD-JWT (dc+sd-jwt format)
+    Issuer->>Issuer: Prepare SD-JWT or mDoc credential
+    Issuer-->>WalletApp: Return credential (dc+sd-jwt or mso_mdoc format)
     WalletApp->>WalletApp: Verify SD-JWT signature using x5c certificate
     WalletApp->>WalletApp: Decode & Display verifiable credentials
     WalletApp->>WalletApp: Save credentials in Encrypted Shared Preferences
@@ -87,19 +112,30 @@ eyJ4NWMiOlsiTUlJQmtUQ0NBVGVnQXdJQkFnSVVkeVljbDE5ZFlCSjhtY1hHc2NqVXN4c2k2RGt3Q2dZ
 
 ![sdjwt.png](sdjwt.png)
 
+#### mDoc (mso_mdoc)
+
+Credentials can also be issued in `mso_mdoc` format (ISO 18013-5). The mDoc credential is a CBOR-encoded structure containing the Mobile Security Object (MSO) with issuer-signed data elements and digest-based integrity protection. The response is base64url-encoded CBOR.
+
 ---
 
 ## Demo wallet app (Android)
 
-Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions.
+Available [here](https://github.com/kmandalas/android-vci-vp) along with instructions and [screen recordings](https://github.com/kmandalas/android-vci-vp#demo-video)
 
 ---
 
 ## VP
 
-### Same Device Flow (our demo)
+### Same Device & Cross Device Flow
 
-The verifier uses JWT-Secured Authorization Request (JAR) with x5c certificate chain for request authentication, and the wallet encrypts the VP response using ECDH-ES + A256GCM.
+The verifier web UI is available at `http://localhost:9002/verifier/select`. Select a credential format (SD-JWT or mDoc) and click **Request Presentation** to generate a QR code and deep links. Two flows are supported:
+
+- **Same-device**: Tap the `haip-vp://` or `openid4vp://` deep link to open the wallet directly on the same device.
+- **Cross-device**: Scan the QR code with the wallet app on another device.
+
+In both cases, the verifier signs the authorization request as a JAR (JWT with x5c header) and the wallet encrypts the VP response using ECDH-ES + A256GCM. The verifier UI polls for the result via HTMX and displays the disclosed claims inline once the wallet submits the VP.
+
+![verifier-ui.png](verifier-ui.png)
 
 ```
 sequenceDiagram
@@ -120,13 +156,23 @@ sequenceDiagram
     W ->> W: Parse DCQL query from verified JWT
     W ->> W: Fetch locally stored VC
     W ->> W: Prompt user for selective disclosure
-    W ->> W: Create VP with Key Binding JWT
+    alt dc+sd-jwt
+        W ->> W: Create VP with selected disclosures + Key Binding JWT
+    else mso_mdoc
+        W ->> W: Build DeviceResponse with SessionTranscript & DeviceAuth (COSE_Sign1)
+    end
     W ->> W: Encrypt response (ECDH-ES + A256GCM)
     W ->> V: POST encrypted vp_token (direct_post.jwt)
     V ->> V: Decrypt response with ephemeral private key
-    V ->> IS: Fetch issuer's public key (or use x5c from credential)
-    V ->> V: Verify SD-JWT credential signature
-    V ->> V: Verify Key Binding JWT
+    alt dc+sd-jwt
+        V ->> IS: Fetch issuer's public key (or use x5c from credential)
+        V ->> V: Verify SD-JWT credential signature
+        V ->> V: Verify Key Binding JWT
+    else mso_mdoc
+        V ->> V: Verify IssuerAuth (COSE_Sign1) + MSO digests
+        V ->> V: Verify SessionTranscript
+        V ->> V: Verify DeviceAuth signature
+    end
     V ->> IS: Check Token Status List (revocation)
     V -->> W: Return verification result
     W ->> W: Display verification outcome
@@ -138,7 +184,7 @@ sequenceDiagram
 
 The verifier uses DCQL (Digital Credentials Query Language) to request specific claims from credentials.
 
-Sample (demo):
+SD-JWT sample (demo):
 ```json
 {
   "client_id": "x509_hash:a54_NCUlnbgC-1PfaZIppUTinKy4ITcmSo6KtXxyFCE",
@@ -175,6 +221,28 @@ Sample (demo):
 }
 ```
 
+For mDoc credentials, the DCQL query uses `mso_mdoc` format with a `doctype_value` and two-element claim paths `[namespace, elementIdentifier]`:
+```json
+{
+  "dcql_query": {
+    "credentials": [
+      {
+        "id": "pda1_credential",
+        "format": "mso_mdoc",
+        "meta": {
+          "doctype_value": "eu.europa.ec.eudi.pda1.1"
+        },
+        "claims": [
+          { "path": ["eu.europa.ec.eudi.pda1.1", "credential_holder"] },
+          { "path": ["eu.europa.ec.eudi.pda1.1", "nationality"] },
+          { "path": ["eu.europa.ec.eudi.pda1.1", "competent_institution"] }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ### vp_token Response
 
 The wallet sends an encrypted JWE containing the vp_token in DCQL format:
@@ -187,6 +255,8 @@ The wallet sends an encrypted JWE containing the vp_token in DCQL format:
   "state": "optional-state-value"
 }
 ```
+
+For mDoc credentials, the vp_token value is a base64url-encoded CBOR `DeviceResponse` containing `DeviceAuth` (COSE_Sign1 with session transcript) and the disclosed data elements.
 
 Sample vp_token (demo):
 ```
@@ -215,7 +285,52 @@ The wallet-provider module acts as the trust anchor for wallet instances and the
 
 **WUA (Wallet Unit Attestation)** — Issues `key-attestation+jwt` tokens after validating Android Key Attestation certificate chains against Google's root CA. The WUA captures the key's security level (software, TEE, or StrongBox) and maps it to ISO 18045 attack-potential resistance levels. The issuer checks the WUA before issuing credentials.
 
+**Remote WSCD (QTSP)** — The wallet-provider also supports remote WSCD attestation via `QtspAttestationService`. When a wallet uses a remote signing key managed by a QTSP (see qtsp-mock), the wallet-provider validates the QTSP certificate chain against the trust-validator, verifies SCAL=2 compliance, and issues a WUA with `wscd_type: "remote_qscd"`.
+
 **Token Status List** — Each WUA is assigned an index in a compressed bitstring published as a signed JWT (`application/statuslist+jwt`) per `draft-ietf-oauth-status-list`. The issuer fetches the status list and checks the relevant bit to determine whether a WUA has been revoked, providing a privacy-preserving revocation mechanism.
+
+---
+
+## Trust Validator
+
+The trust-validator is a standalone X.509 trust chain validation service that answers: *"is this certificate chain trusted for this verification context?"*
+
+It decouples trust evaluation from individual services — the auth-server, issuer, and verifier each delegate chain validation via a simple `POST /trust` call instead of embedding their own trust logic. This means the trust infrastructure can be upgraded (e.g. to EU Lists of Trusted Lists) without touching service code.
+
+**Feature-flagged in all consumers.** Each consumer (auth-server, issuer, verifier, wallet-provider) has a `trust-validator.enabled` flag that defaults to `false`. When disabled, consumers fall back to their configured `trusted-issuers` lists.
+
+**Key capabilities:**
+- **15 EUDI ARF verification contexts** — `WalletInstanceAttestation`, `PID`, `QEAA`, `PubEAA`, `EAA`, and their status-list counterparts, plus `WalletRelyingPartyAccessCertificate`, `QTSPSigningCertificate`, and `Custom`
+- **Two trust source modes** — local KeyStore (ships with project CA, works out of the box) or EU LoTL via DSS with scheduled refresh
+- **Browser UI** at `http://localhost:8090/validate` for manual certificate chain testing
+- **Consumer integration** — identical `TrustValidatorClient` in auth-server (WIA chain), issuer (WUA chain), and verifier (credential issuer chain)
+
+In a production deployment, this service would sit on an internal network — its security posture (mTLS, service mesh, network isolation) depends on the zero-trust model of the environment.
+
+---
+
+## QTSP Mock (Remote WSCD)
+
+The qtsp-mock module provides a mock Qualified Trust Service Provider implementing the **CSC API v2** (ETSI TS 119 432) for remote WSCD key management. It demonstrates how a wallet can use remotely-managed signing keys instead of device-local keys (Android Keystore).
+
+**CSC API endpoints:**
+- `POST /csc/v2/credentials/list` — List available signing credentials
+- `POST /csc/v2/credentials/info` — Get credential details (key algorithm, certificate chain, SCAL level)
+- `POST /csc/v2/credentials/authorize` — Obtain a single-use SAD (Signature Activation Data) token
+- `POST /csc/v2/signatures/signHash` — Sign a hash using the authorized credential
+
+**Key features:**
+- EC P-256 signing key generated on startup with a stable CA (ships with project)
+- Single-use SAD tokens for signature activation (SCAL=2)
+- Static API key authentication (`ApiKey` header)
+- Dashboard UI at `/dashboard` (Thymeleaf + HTMX) for testing CSC operations interactively
+
+**Integration with the ecosystem:**
+- **wallet-provider** — `QtspAttestationService` accepts `qtsp_attestation` type requests, validates the QTSP certificate chain against the trust-validator, verifies SCAL=2, and issues a WUA with `wscd_type: "remote_qscd"`
+- **trust-validator** — QTSP CA is included in `local-trust.jks`; chain validation uses the `QTSPSigningCertificate` verification context
+- **K-Wallet Android app** — Supports toggling between local (Android Keystore) and remote (QTSP) signing modes
+
+In production, the mock QTSP would be replaced by a certified QTSP's HSM-backed infrastructure. See [`qtsp-mock/notes/QTSP-REMOTE-QSCD.md`](./qtsp-mock/notes/QTSP-REMOTE-QSCD.md) for full details, diagrams, and spec compliance notes.
 
 ---
 
@@ -233,8 +348,10 @@ This implementation includes the following HAIP-compliant features:
 | **x509_hash client_id** | Client identification via SHA-256 hash of DER-encoded certificate |
 | **DCQL** | Digital Credentials Query Language for credential requests |
 | **dc+sd-jwt** | HAIP-compliant credential format with x5c header |
+| **mso_mdoc** | ISO 18013-5 mDoc credential format with COSE_Sign1 IssuerAuth |
 | **VP Encryption** | Response encryption using ECDH-ES + A256GCM |
 | **haip-vp:// scheme** | HAIP-compliant URI scheme for wallet invocation |
+| ⭐ **Remote WSCD** | CSC API v2 (ETSI TS 119 432) for remote WSCD key management via QTSP |
 
 ---
 
@@ -244,3 +361,41 @@ This implementation includes the following HAIP-compliant features:
 This repo contains an **experimental project** created for learning and demonstration purposes. The implementation is **not intended for production** use.
 
 </details>
+
+---
+
+## 💼 Enterprise & Professional Services
+
+This project is a **teaser** — a working proof-of-concept demonstrating a fully functional EUDI-compliant ecosystem.
+If you need a production-ready solution, I can deliver a complete, end-to-end EUDI stack tailored to your needs:
+
+### What can be delivered
+
+#### Full-stack engagements
+
+- **HSM integration** — Hardware Security Module support for issuer and wallet-provider signing keys (LoA High compliance)
+- **Remote WSCA** — Production-grade Remote Wallet Secure Cryptographic Application with certified QTSP HSM integration (the included qtsp-mock demonstrates the CSC API v2 flow end-to-end)
+- **Production-grade storage** — Replace H2 with a production database of your choice (PostgreSQL, MySQL, CosmosDB, etc.); credential status, WUA, and session data on a robust, scalable store
+- **Key Vault integration** — AWS KMS, Azure Key Vault, or HashiCorp Vault for secret/key lifecycle management
+- **Full microservices setup** — Containerised (Docker/Kubernetes), horizontally scalable, with distributed caching (e.g. Redis) for JTI replay protection, session management etc.
+- **Wallet apps (Android & iOS)** — Custom-branded and themed to your organisation's identity; delivered as your own product
+- **Complete EUDI solution** — Issuer + Verifier + Wallet App (Android & iOS) + Wallet Provider as a coherent, deployable product
+- **Admin consoles** — Management UIs for wallet provider, issuer, and verifier operations (credential revocation, status list monitoring, WUA management, audit logs)
+- **Multiple credential types** — Extend beyond the demo PDA1 to PID, mDL, EAA, and custom attestation types per your rulebooks
+- **LoTL / Trust Validator** — ETSI TS 119 612 Lists of Trusted Lists integration for federated, EU-compliant trust infrastructure across issuers, verifiers, and wallet providers
+- **LoA High compliance** — Architecture and attestation chain designed to satisfy Level of Assurance High requirements under eIDAS 2.0 / ARF
+
+#### Standalone / component engagements
+
+- **Standalone Verifier for Relying Parties** — If your use case is accepting EUDI wallet presentations — without issuing credentials or operating a wallet — I can consult on and implement a standalone, HAIP-compliant OID4VP verifier tailored to your credential types, trust model, and integration requirements; from architecture advice through to production implementation
+- **Standalone Issuer** — If you need to issue verifiable credentials (e.g. as a government agency, university, or bank) without operating a full EUDI stack, I can design and implement an OID4VCI-compliant issuer for your specific credential types and rulebooks, including integration with your Authentic Sources (civil registries, population registers, HR systems, or any internal database)
+
+### Contact
+
+Interested? Reach out via [GitHub](https://github.com/kmandalas) to discuss your requirements.
+
+---
+
+## License
+
+[Business Source License 1.1](./LICENSE) — free for non-production use.

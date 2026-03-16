@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/native-image-community:latest as build
+FROM ghcr.io/graalvm/native-image-community:25 as build
 WORKDIR /workspace/app
 
 # Copy the project files

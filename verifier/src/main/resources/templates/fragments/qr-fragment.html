@@ -1,0 +1,43 @@
+<div class="kw-qr-card" xmlns:th="http://www.thymeleaf.org">
+    <div class="mb-3">
+        <span class="format-badge" th:classappend="${formatBadgeClass}" th:text="${formatLabel}">SD-JWT</span>
+    </div>
+    <p class="scheme-label">
+        Requesting: <code th:text="${credentialDoctype}">eu.europa.ec.eudi.pda1.1</code>
+        (<span th:text="${formatValue}">dc+sd-jwt</span>)
+    </p>
+    <p class="scheme-label">QR Code uses <code>haip-vp://</code> scheme (HAIP compliant)</p>
+
+    <div id="qrcode"></div>
+
+    <p class="my-3">- OR -</p>
+
+    <div>
+        <a th:href="${haipDeepLink}" class="wallet-link haip">HAIP Wallet</a>
+        <a th:href="${openid4vpDeepLink}" class="wallet-link openid">OpenID4VP Wallet</a>
+    </div>
+
+    <div id="vp-result"
+         th:attr="hx-get=@{/verifier/result/{id}(id=${requestId})}"
+         hx-trigger="every 2s"
+         hx-swap="outerHTML">
+        <div class="mt-4 text-center">
+            <div class="spinner-border spinner-border-sm text-muted" role="status"></div>
+            <span class="text-muted ms-2">Waiting for wallet response...</span>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        (function () {
+            var deepLink = [[${haipDeepLink}]];
+            var container = document.getElementById('qrcode');
+            container.innerHTML = '';
+            new QRCode(container, {
+                text: deepLink,
+                width: 256,
+                height: 256,
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        })();
+    </script>
+</div>

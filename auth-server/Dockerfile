@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/native-image-community:latest as build
+FROM ghcr.io/graalvm/native-image-community:25 as build
 WORKDIR /workspace/app
 
 # Copy the project files
@@ -21,6 +21,3 @@ COPY --from=build /workspace/app/target/auth-server /app/auth-server
 EXPOSE 9000
 
 ENTRYPOINT ["/app/auth-server"]
-
-# CMD with dynamic port
-# CMD ["sh", "-c", "/app/auth-server -Dserver.port=${PORT:-9000}"]

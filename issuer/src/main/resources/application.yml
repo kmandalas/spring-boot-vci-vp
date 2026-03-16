@@ -45,6 +45,9 @@ app:
     trusted-issuers:
       - http://${LOCAL_IP:localhost}:9001/wp
     allowed-wscd-types: all  # Options: all, software, tee, strongbox (comma-separated)
+    trust-validator:
+      enabled: false
+      url: http://localhost:8090
 
 ---
 spring:
@@ -73,3 +76,6 @@ app:
     trusted-issuers:
       - https://wallet-provider.onrender.com/wp
     allowed-wscd-types: all
+    trust-validator:
+      enabled: false
+      url: http://localhost:8090

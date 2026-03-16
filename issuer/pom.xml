@@ -5,18 +5,18 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <version>4.0.3</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>dev.kmandalas</groupId>
     <artifactId>issuer</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>issuer</name>
     <description>issuer</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
     </properties>
 
     <dependencies>
@@ -26,12 +26,21 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
         </dependency>
         <dependency>
             <groupId>com.authlete</groupId>
             <artifactId>sd-jwt</artifactId>
-            <version>1.5</version>
+            <version>1.7</version>
+        </dependency>
+        <dependency>
+            <groupId>com.authlete</groupId>
+            <artifactId>cbor</artifactId>
+            <version>1.19</version>
         </dependency>
 
         <dependency>
@@ -64,7 +73,6 @@
             <plugin>
                 <groupId>org.graalvm.buildtools</groupId>
                 <artifactId>native-maven-plugin</artifactId>
-                <version>0.10.6</version>
                 <configuration>
                     <buildArgs>
                         <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>

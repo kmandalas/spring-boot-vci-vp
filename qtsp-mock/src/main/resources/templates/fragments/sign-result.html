@@ -1,0 +1,33 @@
+<div xmlns:th="http://www.thymeleaf.org">
+
+    <!-- Success -->
+    <div th:if="${success}" class="result-success">
+        <div class="d-flex align-items-center mb-2">
+            <strong style="color: var(--kw-green); font-size: 1.1rem;">Signature Created</strong>
+        </div>
+
+        <div class="result-label">1. Data</div>
+        <div class="result-value" th:text="${dataToSign}"></div>
+
+        <div class="result-label">2. SAD Issued &amp; Consumed (single-use)</div>
+        <div class="result-value" th:text="${sad}"></div>
+
+        <div class="result-label">3. SHA-256 Hash (Base64)</div>
+        <div class="result-value" th:text="${hashBase64}"></div>
+
+        <div class="result-label">4. EC Signature (Base64 DER)</div>
+        <div class="result-value" th:text="${signature}"></div>
+
+        <div class="mt-2" style="font-size: 0.8rem; color: #888;">
+            The SAD was created and consumed in a single operation. In production, the wallet app calls
+            <code>credentials/authorize</code> and <code>signatures/signHash</code> as separate API calls.
+        </div>
+    </div>
+
+    <!-- Error -->
+    <div th:if="${error}" class="result-error">
+        <strong style="color: #c0392b;">Error</strong>
+        <p class="mb-0 mt-1" th:text="${error}"></p>
+    </div>
+
+</div>
