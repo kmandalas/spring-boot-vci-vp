@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Two-Factor Authentication - WUA Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 0;
+        }
+        .setup-card {
+            max-width: 500px;
+            width: 100%;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .qr-code {
+            border: 4px solid #f8f9fa;
+            border-radius: 1rem;
+            padding: 1rem;
+            background: white;
+        }
+        .secret-code {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            letter-spacing: 0.1rem;
+            background: #f8f9fa;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            word-break: break-all;
+        }
+        .code-input {
+            font-size: 1.5rem;
+            letter-spacing: 0.5rem;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+<div class="card setup-card border-0 mx-3">
+    <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+            <i class="bi bi-qr-code-scan text-primary" style="font-size: 3rem;"></i>
+            <h3 class="mt-3">Setup Two-Factor Authentication</h3>
+            <p class="text-muted">Secure your account with Google Authenticator or any TOTP app</p>
+        </div>
+
+        <div th:if="${error}" class="alert alert-danger">
+            <i class="bi bi-exclamation-circle me-2"></i>
+            <span th:text="${error}">Error</span>
+        </div>
+
+        <!-- Step 1: Download App -->
+        <div class="mb-4">
+            <h5><span class="step-number me-2">1</span> Install an Authenticator App</h5>
+            <p class="text-muted ms-4 mb-0">
+                Download Google Authenticator, Microsoft Authenticator, or Authy on your phone.
+            </p>
+        </div>
+
+        <!-- Step 2: Scan QR Code -->
+        <div class="mb-4">
+            <h5><span class="step-number me-2">2</span> Scan the QR Code</h5>
+            <div class="text-center my-4">
+                <img th:src="${qrCodeUri}" alt="TOTP QR Code" class="qr-code img-fluid"
+                     style="max-width: 200px;">
+            </div>
+            <p class="text-muted text-center mb-2">
+                Can't scan? Enter this code manually:
+            </p>
+            <div class="text-center">
+                <code class="secret-code" th:text="${secret}">SECRET_CODE</code>
+            </div>
+        </div>
+
+        <!-- Step 3: Enter Code -->
+        <div class="mb-4">
+            <h5><span class="step-number me-2">3</span> Enter Verification Code</h5>
+            <p class="text-muted ms-4">
+                Enter the 6-digit code shown in your authenticator app to verify setup.
+            </p>
+
+            <form th:action="@{/setup-totp/verify}" method="post" class="mt-3">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control form-control-lg code-input mb-3"
+                               name="code" maxlength="6" pattern="[0-9]{6}"
+                               placeholder="000000" required
+                               autocomplete="one-time-code" inputmode="numeric">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-shield-check me-2"></i> Enable Two-Factor Authentication
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="text-center">
+            <form th:action="@{/logout}" method="post" class="d-inline">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button type="submit" class="btn btn-link text-muted">
+                    <i class="bi bi-arrow-left me-1"></i> Cancel and logout
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Only allow numeric input
+    document.querySelector('.code-input').addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+</script>
+</body>
+</html>
