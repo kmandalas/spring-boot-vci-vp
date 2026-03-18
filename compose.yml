@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: eudi
+      POSTGRES_USER: eudi
+      POSTGRES_PASSWORD: eudi
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-schemas.sql:/docker-entrypoint-initdb.d/init-schemas.sql
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

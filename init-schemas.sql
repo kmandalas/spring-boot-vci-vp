@@ -1,0 +1,5 @@
+-- Create schemas for each module
+CREATE SCHEMA IF NOT EXISTS wp;
+CREATE SCHEMA IF NOT EXISTS issuer;
+CREATE SCHEMA IF NOT EXISTS wpadmin;
+CREATE SCHEMA IF NOT EXISTS qtsp;
