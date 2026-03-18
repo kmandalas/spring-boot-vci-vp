@@ -22,8 +22,6 @@ cors:
   origins: "*"
   methods: "*"
   headers: "*"
-  credentials: false
-  maxAge: 3600
 
 # DSS cache — directory for LoTL data caching
 # trust-validator.dss.cache-location=./dss-cache
