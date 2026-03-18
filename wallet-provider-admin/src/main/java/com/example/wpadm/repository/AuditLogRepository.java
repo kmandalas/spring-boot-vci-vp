@@ -6,6 +6,8 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.UUID;
 
+import static com.example.wpadm.util.JdbcUtil.toOffsetDateTime;
+
 @Repository
 public class AuditLogRepository {
 
@@ -25,7 +27,7 @@ public class AuditLogRepository {
             .param("action", action)
             .param("targetId", targetId)
             .param("details", details)
-            .param("createdAt", Instant.now())
+            .param("createdAt", toOffsetDateTime(Instant.now()))
             .update();
     }
 }

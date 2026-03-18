@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.interfaces.ECPublicKey;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/dashboard")
@@ -36,12 +37,26 @@ public class DashboardController {
     }
 
     @GetMapping
-    public String dashboard(Model model) {
+    public String dashboard(@RequestParam(value = "userId", required = false) String userIdFilter, Model model) {
+        List<ManagedCredential> allCredentials = keyManagementService.listAllCredentials();
+
+        // Collect distinct userIds for the filter dropdown
+        List<String> userIds = allCredentials.stream()
+                .map(ManagedCredential::userId)
+                .distinct()
+                .sorted()
+                .toList();
+
+        // Apply filter if provided
+        List<ManagedCredential> filtered = (userIdFilter != null && !userIdFilter.isBlank())
+                ? allCredentials.stream().filter(c -> c.userId().equals(userIdFilter)).toList()
+                : allCredentials;
+
         List<Map<String, Object>> credentials = new ArrayList<>();
-        for (String id : keyManagementService.listCredentialIds()) {
-            ManagedCredential cred = keyManagementService.getCredential(id);
+        for (ManagedCredential cred : filtered) {
             Map<String, Object> credMap = new LinkedHashMap<>();
-            credMap.put("id", id);
+            credMap.put("id", cred.credentialId());
+            credMap.put("userId", cred.userId());
             credMap.put("subjectDN", cred.userCertificate().getSubjectX500Principal().getName());
             credMap.put("issuerDN", cred.userCertificate().getIssuerX500Principal().getName());
             credMap.put("notBefore", cred.userCertificate().getNotBefore());
@@ -58,7 +73,10 @@ public class DashboardController {
 
             credentials.add(credMap);
         }
+
         model.addAttribute("credentials", credentials);
+        model.addAttribute("userIds", userIds);
+        model.addAttribute("selectedUserId", userIdFilter);
         return "dashboard";
     }
 

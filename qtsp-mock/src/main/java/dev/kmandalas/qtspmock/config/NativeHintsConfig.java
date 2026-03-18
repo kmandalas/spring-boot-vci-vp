@@ -1,6 +1,7 @@
 package dev.kmandalas.qtspmock.config;
 
 import dev.kmandalas.qtspmock.model.*;
+import dev.kmandalas.qtspmock.repository.CredentialRepository;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -35,6 +36,7 @@ public class NativeHintsConfig {
             hints.reflection().registerType(CredentialAuthorizeResponse.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(SignHashRequest.class, ALL_MEMBER_CATEGORIES);
             hints.reflection().registerType(SignHashResponse.class, ALL_MEMBER_CATEGORIES);
+            hints.reflection().registerType(CredentialRepository.PersistedCredential.class, ALL_MEMBER_CATEGORIES);
         }
     }
 }

@@ -19,6 +19,7 @@ public final class WuaDisplayUtils {
             case "strongbox" -> "iso_18045_high";
             case "tee" -> "iso_18045_high";
             case "software" -> "iso_18045_basic";
+            case "remote_qscd" -> "iso_18045_high";
             default -> "unknown";
         };
     }
@@ -34,6 +35,7 @@ public final class WuaDisplayUtils {
             case "strongbox" -> "StrongBox (Hardware)";
             case "tee" -> "TEE (Trusted Execution)";
             case "software" -> "Software";
+            case "remote_qscd" -> "Remote QSCD";
             default -> capitalize(wscdType);
         };
     }
@@ -64,6 +66,7 @@ public final class WuaDisplayUtils {
             case "strongbox" -> "bg-success";  // Green for hardware
             case "tee" -> "bg-primary";        // Blue for TEE
             case "software" -> "bg-warning text-dark";  // Yellow for software
+            case "remote_qscd" -> "bg-info text-dark";  // Teal for remote QSCD
             default -> "bg-secondary";
         };
     }
@@ -94,6 +97,7 @@ public final class WuaDisplayUtils {
             case "strongbox" -> "bi-shield-fill-check";  // Shield with check
             case "tee" -> "bi-cpu-fill";                 // CPU for TEE
             case "software" -> "bi-code-slash";          // Code for software
+            case "remote_qscd" -> "bi-cloud-fill";       // Cloud for remote QSCD
             default -> "bi-question-circle";
         };
     }

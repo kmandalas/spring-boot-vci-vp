@@ -5,6 +5,15 @@ spring:
   application:
     name: qtsp-mock
 
+  datasource:
+    url: jdbc:postgresql://localhost:5432/eudi?currentSchema=qtsp
+    username: eudi
+    password: eudi
+
+  sql:
+    init:
+      mode: always
+
   ssl:
     bundle:
       pem:
@@ -22,6 +31,11 @@ spring:
   config:
     activate:
       on-profile: cloud
+
+  datasource:
+    url: ${DB_URL}&currentSchema=qtsp
+    username: ${DB_USER:eudi}
+    password: ${DB_PASSWORD}
 
 qtsp:
   api-key: ${QTSP_API_KEY:qtsp-demo-api-key}

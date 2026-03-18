@@ -4,8 +4,6 @@ import com.example.wpadm.model.WuaView;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Repository
@@ -21,7 +19,7 @@ public class WuaAdminRepository {
         StringBuilder sql = new StringBuilder("""
             SELECT wua_id, wallet_public_key_thumbprint, status, wscd_type,
                    wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx
-            FROM wallet_unit_attestations WHERE 1=1
+            FROM wua_projections WHERE 1=1
             """);
 
         Map<String, Object> params = new HashMap<>();
@@ -35,7 +33,7 @@ public class WuaAdminRepository {
             params.put("wscdType", wscdType);
         }
         if (search != null && !search.isEmpty()) {
-            sql.append(" AND (wallet_public_key_thumbprint LIKE :search OR CAST(wua_id AS VARCHAR) LIKE :search)");
+            sql.append(" AND (wallet_public_key_thumbprint ILIKE :search OR CAST(wua_id AS VARCHAR) ILIKE :search)");
             params.put("search", "%" + search + "%");
         }
 
@@ -50,7 +48,7 @@ public class WuaAdminRepository {
     }
 
     public long countAll(String status, String wscdType, String search) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM wallet_unit_attestations WHERE 1=1");
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM wua_projections WHERE 1=1");
 
         Map<String, Object> params = new HashMap<>();
 
@@ -63,7 +61,7 @@ public class WuaAdminRepository {
             params.put("wscdType", wscdType);
         }
         if (search != null && !search.isEmpty()) {
-            sql.append(" AND (wallet_public_key_thumbprint LIKE :search OR CAST(wua_id AS VARCHAR) LIKE :search)");
+            sql.append(" AND (wallet_public_key_thumbprint ILIKE :search OR CAST(wua_id AS VARCHAR) ILIKE :search)");
             params.put("search", "%" + search + "%");
         }
 
@@ -77,46 +75,15 @@ public class WuaAdminRepository {
         return jdbcClient.sql("""
             SELECT wua_id, wallet_public_key_thumbprint, status, wscd_type,
                    wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx
-            FROM wallet_unit_attestations WHERE wua_id = :wuaId
+            FROM wua_projections WHERE wua_id = :wuaId
             """)
             .param("wuaId", wuaId)
             .query(WuaView.class)
             .optional();
     }
 
-    public int updateStatus(UUID wuaId, String newStatus) {
-        return jdbcClient.sql("UPDATE wallet_unit_attestations SET status = :status WHERE wua_id = :wuaId")
-            .param("status", newStatus)
-            .param("wuaId", wuaId)
-            .update();
-    }
-
-    public long countTotal() {
-        return jdbcClient.sql("SELECT COUNT(*) FROM wallet_unit_attestations")
-            .query(Long.class)
-            .single();
-    }
-
-    public long countByStatus(String status) {
-        return jdbcClient.sql("SELECT COUNT(*) FROM wallet_unit_attestations WHERE status = :status")
-            .param("status", status)
-            .query(Long.class)
-            .single();
-    }
-
-    public long countExpiringSoon(int days) {
-        Instant threshold = Instant.now().plus(days, ChronoUnit.DAYS);
-        return jdbcClient.sql("""
-            SELECT COUNT(*) FROM wallet_unit_attestations
-            WHERE status = 'ACTIVE' AND expires_at <= :threshold
-            """)
-            .param("threshold", threshold)
-            .query(Long.class)
-            .single();
-    }
-
     public List<String> findDistinctWscdTypes() {
-        return jdbcClient.sql("SELECT DISTINCT wscd_type FROM wallet_unit_attestations WHERE wscd_type IS NOT NULL ORDER BY wscd_type")
+        return jdbcClient.sql("SELECT DISTINCT wscd_type FROM wua_projections WHERE wscd_type IS NOT NULL ORDER BY wscd_type")
             .query(String.class)
             .list();
     }
@@ -125,7 +92,7 @@ public class WuaAdminRepository {
         return jdbcClient.sql("""
             SELECT wua_id, wallet_public_key_thumbprint, status, wscd_type,
                    wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx
-            FROM wallet_unit_attestations ORDER BY issued_at DESC LIMIT :limit
+            FROM wua_projections ORDER BY issued_at DESC LIMIT :limit
             """)
             .param("limit", limit)
             .query(WuaView.class)

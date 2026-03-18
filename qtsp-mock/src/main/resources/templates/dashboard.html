@@ -63,7 +63,7 @@
         </div>
         <div class="flow-step">
             <div class="step-number">2</div>
-            <div class="step-text"><code>POST /csc/v2/credentials/list</code> &mdash; List available credential IDs</div>
+            <div class="step-text"><code>POST /csc/v2/credentials/list</code> &mdash; List credentials for a userID</div>
         </div>
         <div class="flow-step">
             <div class="step-number">3</div>
@@ -79,11 +79,39 @@
         </div>
     </div>
 
+    <!-- User Filter -->
+    <div class="kw-card" th:if="${!userIds.isEmpty()}">
+        <h5>Filter by User</h5>
+        <form method="get" th:action="@{/dashboard}" class="row g-3 align-items-end">
+            <div class="col-auto">
+                <select class="form-select" name="userId">
+                    <option value="">All Users</option>
+                    <option th:each="uid : ${userIds}" th:value="${uid}" th:text="${uid}"
+                            th:selected="${uid == selectedUserId}"></option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-kw-primary">Filter</button>
+            </div>
+            <div class="col-auto" th:if="${selectedUserId != null && !selectedUserId.isEmpty()}">
+                <a th:href="@{/dashboard}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Empty state -->
+    <div class="kw-card" th:if="${credentials.isEmpty()}">
+        <p class="text-muted mb-0">No credentials yet. Credentials are generated lazily when a wallet calls
+            <code>POST /csc/v2/credentials/list</code> with a <code>userID</code>.</p>
+    </div>
+
     <!-- Managed Credentials -->
     <div class="kw-card" th:each="cred : ${credentials}">
         <div class="d-flex justify-content-between align-items-start mb-3">
             <h5 class="mb-0">Managed Credential</h5>
             <div class="d-flex gap-2">
+                <span class="badge bg-info text-dark" th:text="'User: ' + ${cred.userId}"
+                      style="font-size: 0.75rem;"></span>
                 <span class="badge-scal">SCAL 2</span>
                 <span class="badge-hsm">QSCD</span>
                 <span class="badge-ec">EC P-256</span>

@@ -55,8 +55,9 @@ public class CscController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CredentialsListResponse> listCredentials(@RequestBody(required = false) CredentialsListRequest request) {
-        List<String> credentialIds = keyManagementService.listCredentialIds();
-        logger.info("📋 Listed {} credentials", credentialIds.size());
+        String userId = (request != null) ? request.userId() : null;
+        List<String> credentialIds = keyManagementService.listCredentialIds(userId);
+        logger.info("📋 Listed {} credentials for user '{}'", credentialIds.size(), userId);
         return ResponseEntity.ok(new CredentialsListResponse(credentialIds));
     }
 

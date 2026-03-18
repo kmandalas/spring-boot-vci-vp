@@ -1,15 +1,19 @@
 package com.example.wpadm.config;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.authorization.EnableMultiFactorAuthentication;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 
 @Configuration
 @EnableWebSecurity
@@ -27,6 +31,22 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * If the session expired and the CSRF token is stale, a POST /logout gets a 403.
+     * Redirect that specific case to the login page instead of showing an error.
+     */
+    private AccessDeniedHandler logoutAwareAccessDeniedHandler() {
+        var defaultHandler = new AccessDeniedHandlerImpl();
+        return (HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex) -> {
+            if ("POST".equals(request.getMethod()) && "/logout".equals(request.getRequestURI())) {
+                request.getSession(false); // don't create a new session
+                response.sendRedirect(request.getContextPath() + "/login?expired=true");
+            } else {
+                defaultHandler.handle(request, response, ex);
+            }
+        };
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -34,7 +54,6 @@ public class SecurityConfig {
                 // Public resources
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
                 // TOTP pages require password factor (single-factor authenticated)
                 .requestMatchers("/totp/**", "/setup-totp/**").hasAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                 // Protected pages require TOTP factor (fully MFA authenticated)
@@ -55,16 +74,12 @@ public class SecurityConfig {
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
             )
+            .exceptionHandling(ex -> ex
+                .accessDeniedHandler(logoutAwareAccessDeniedHandler())
+            )
             .sessionManagement(session -> session
                 .maximumSessions(1)
                 .expiredUrl("/login?expired=true")
-            )
-            // For H2 console
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/h2-console/**")
-            )
-            .headers(headers -> headers
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
             );
 
         return http.build();

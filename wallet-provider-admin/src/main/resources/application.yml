@@ -1,26 +1,19 @@
 server:
-  port: 9003
+  port: 9004
 
 spring:
   application:
     name: wallet-provider-admin
 
-  # Shared H2 database with wallet-provider (AUTO_SERVER allows multiple connections)
   datasource:
-    url: jdbc:h2:file:./data/walletprovider;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/eudi?currentSchema=wpadmin
+    username: eudi
+    password: eudi
 
   sql:
     init:
       mode: always
       schema-locations: classpath:schema-admin.sql
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 
   thymeleaf:
     cache: false
@@ -31,6 +24,12 @@ spring:
 admin:
   totp:
     issuer: "WUA Admin Console"
+
+# Wallet-provider connection (event polling + revocation commands)
+wallet-provider:
+  base-url: http://localhost:9001
+  api-key: changeme-admin-key
+  poll-interval-seconds: 5
 
 logging:
   level:
@@ -44,4 +43,9 @@ spring:
       on-profile: cloud
 
   datasource:
-    url: jdbc:h2:file:./data/walletprovider-cloud;AUTO_SERVER=TRUE
+    url: ${DB_URL}&currentSchema=wpadmin
+    username: ${DB_USER:eudi}
+    password: ${DB_PASSWORD}
+
+wallet-provider:
+  base-url: https://wallet-provider.onrender.com

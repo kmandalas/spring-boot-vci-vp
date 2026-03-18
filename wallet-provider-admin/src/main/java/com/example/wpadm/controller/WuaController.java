@@ -2,6 +2,7 @@ package com.example.wpadm.controller;
 
 import com.example.wpadm.config.AdminUserDetails;
 import com.example.wpadm.model.WuaView;
+import com.example.wpadm.service.WalletProviderUnavailableException;
 import com.example.wpadm.service.WuaAdminService;
 import com.example.wpadm.util.WuaDisplayUtils;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -129,12 +130,17 @@ public class WuaController {
                            @AuthenticationPrincipal AdminUserDetails adminUser,
                            RedirectAttributes redirectAttributes) {
 
-        boolean success = wuaAdminService.revokeWua(wuaId, reason, adminUser.getUsername());
+        try {
+            boolean success = wuaAdminService.revokeWua(wuaId, reason, adminUser.getUsername());
 
-        if (success) {
-            redirectAttributes.addFlashAttribute("success", "WUA has been revoked successfully");
-        } else {
-            redirectAttributes.addFlashAttribute("error", "Failed to revoke WUA");
+            if (success) {
+                redirectAttributes.addFlashAttribute("success", "WUA has been revoked successfully");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Failed to revoke WUA");
+            }
+        } catch (WalletProviderUnavailableException e) {
+            redirectAttributes.addFlashAttribute("error",
+                    "Wallet provider is currently unavailable. Please try again later.");
         }
 
         return "redirect:/wua/" + wuaId;
