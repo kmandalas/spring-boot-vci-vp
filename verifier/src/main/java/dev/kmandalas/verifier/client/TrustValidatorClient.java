@@ -22,8 +22,8 @@ public class TrustValidatorClient {
 
     private final RestClient restClient;
 
-    record TrustRequest(List<String> chain, String verificationContext, String useCase) {}
-    record TrustResponse(boolean trusted, String trustAnchor) {}
+    public record TrustRequest(List<String> chain, String verificationContext, String useCase) {}
+    public record TrustResponse(boolean trusted, String trustAnchor) {}
 
     public TrustValidatorClient(RestClient.Builder builder, AppConfig config) {
         this.restClient = builder.baseUrl(config.getTrustValidator().getUrl()).build();

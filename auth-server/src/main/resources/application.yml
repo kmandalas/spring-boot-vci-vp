@@ -44,7 +44,7 @@ app:
     max-pop-age-seconds: 900  # Allow up to 15 min skew (Render server clock drift vs device)
     max-wia-age-seconds: 86400
     trust-validator:
-      enabled: false
+      enabled: true
       url: https://trust-validator.onrender.com
   require-consent: true
   extra-redirect-uris: "https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback"

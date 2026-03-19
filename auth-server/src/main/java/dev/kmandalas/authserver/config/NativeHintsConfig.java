@@ -1,5 +1,6 @@
 package dev.kmandalas.authserver.config;
 
+import dev.kmandalas.authserver.client.TrustValidatorClient;
 import dev.kmandalas.authserver.controller.AuthorizationConsentController;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
@@ -31,6 +32,10 @@ public class NativeHintsConfig {
             hints.reflection().registerType(
                     AuthorizationConsentController.ScopeWithDescription.class,
                     ALL_MEMBER_CATEGORIES);
+
+            // Records used by TrustValidatorClient (RestClient serialization/deserialization)
+            hints.reflection().registerType(TrustValidatorClient.TrustRequest.class, ALL_MEMBER_CATEGORIES);
+            hints.reflection().registerType(TrustValidatorClient.TrustResponse.class, ALL_MEMBER_CATEGORIES);
         }
     }
 }
