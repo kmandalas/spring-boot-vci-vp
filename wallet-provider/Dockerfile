@@ -1,23 +1,22 @@
-FROM ghcr.io/graalvm/native-image-community:25 as build
+FROM maven:3.9-eclipse-temurin-25-alpine AS build
 WORKDIR /workspace/app
 
 # Copy the project files
 COPY ../pom.xml ../
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests -Pnative,enhance native:compile
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests
 
-FROM ghcr.io/linuxcontainers/alpine:3.20
+FROM eclipse-temurin:25-jre-alpine
 
 VOLUME /tmp
-RUN apk add --no-cache libc6-compat
 
 # Set the Spring profile to 'cloud'
 ENV SPRING_PROFILES_ACTIVE=cloud
 
-COPY --from=build /workspace/app/target/wallet-provider /app/wallet-provider
+COPY --from=build /workspace/app/target/*.jar /app/wallet-provider.jar
 
 # Expose the application's port
 EXPOSE 9001
 
-ENTRYPOINT ["/app/wallet-provider"]
+ENTRYPOINT ["java", "-jar", "/app/wallet-provider.jar"]

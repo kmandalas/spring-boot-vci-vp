@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS status_lists (
     id VARCHAR(36) PRIMARY KEY,
     bits INT NOT NULL DEFAULT 1,
     max_entries INT NOT NULL DEFAULT 1000,
-    created_at TIMESTAMP NOT NULL
+    created_at TIMESTAMPTZ NOT NULL
 );
 
 -- Wallet Unit Attestations table
@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS wallet_unit_attestations (
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     wscd_type VARCHAR(50) NOT NULL,
     wscd_security_level VARCHAR(50) NOT NULL,
-    issued_at TIMESTAMP NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
+    issued_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
     -- Token Status List fields
     status_list_id VARCHAR(36),
     status_list_idx INT,
@@ -25,3 +25,14 @@ CREATE TABLE IF NOT EXISTS wallet_unit_attestations (
 INSERT INTO status_lists (id, bits, max_entries, created_at)
 SELECT '1', 1, 1000, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM status_lists WHERE id = '1');
+
+-- WUA events table (populated by outbox handler, consumed by admin via REST polling)
+CREATE TABLE IF NOT EXISTS wua_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_type VARCHAR(50) NOT NULL,
+    event_key VARCHAR(255) NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_wua_events_id ON wua_events (id);

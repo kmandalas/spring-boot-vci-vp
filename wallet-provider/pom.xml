@@ -38,15 +38,22 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- JDBC & H2 -->
+        <!-- JDBC & PostgreSQL -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Transactional Outbox (namastack) -->
+        <dependency>
+            <groupId>io.namastack</groupId>
+            <artifactId>namastack-outbox-starter-jdbc</artifactId>
+            <version>1.1.0</version>
         </dependency>
 
         <!-- JWT operations (Nimbus) -->

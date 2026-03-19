@@ -14,19 +14,20 @@ spring:
             private-key: classpath:wp_key.pem
 
   datasource:
-    url: jdbc:h2:file:./data/walletprovider;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/eudi?currentSchema=wp
+    username: eudi
+    password: eudi
 
   sql:
     init:
       mode: always
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+namastack:
+  outbox:
+    polling:
+      fixed:
+        interval: 2000
+      batch-size: 10
 
 firebase:
   app-check:
@@ -60,11 +61,14 @@ wp:
     # Set to true to skip Google root CA validation (for emulator testing)
     skip-chain-validation: true
   qtsp:
-    enabled: false
+    enabled: true
     trusted-issuers:
       - http://localhost:9003
-    trust-validator-enabled: false
+    trust-validator-enabled: true
     trust-validator-url: http://localhost:8090
+  admin-api:
+    enabled: true
+    api-key: ${WP_ADMIN_API_KEY:changeme-admin-key}
 
 ---
 spring:
@@ -73,7 +77,9 @@ spring:
       on-profile: cloud
 
   datasource:
-    url: jdbc:h2:file:./data/walletprovider-cloud;AUTO_SERVER=TRUE
+    url: ${DB_URL}&currentSchema=wp
+    username: ${DB_USER:eudi}
+    password: ${DB_PASSWORD}
 
 firebase:
   app-check:
@@ -92,8 +98,11 @@ wp:
     time:
       max-proof-age-seconds: 900  # Allow up to 15 min skew (Render server clock drift)
   qtsp:
-    enabled: false
-    trust-validator-enabled: false
+    enabled: true
+    trusted-issuers:
+      - https://qtsp-mock.onrender.com
+    trust-validator-enabled: true
+    trust-validator-url: https://trust-validator.onrender.com
   attestation:
     # Production: should always validate certificate chain
     skip-chain-validation: true

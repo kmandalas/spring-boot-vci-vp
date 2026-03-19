@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.UUID;
 
+import static dev.kmandalas.walletprovider.util.JdbcUtil.toOffsetDateTime;
+
 @Repository
 public class WuaRepository {
 
@@ -18,18 +20,22 @@ public class WuaRepository {
 
     public void save(WalletUnitAttestation wua) {
         jdbcClient.sql("""
-            MERGE INTO wallet_unit_attestations
+            INSERT INTO wallet_unit_attestations
             (wua_id, wallet_public_key_thumbprint, status, wscd_type, wscd_security_level, issued_at, expires_at, status_list_id, status_list_idx)
-            KEY (wallet_public_key_thumbprint)
             VALUES (:wuaId, :walletPublicKeyThumbprint, :status, :wscdType, :wscdSecurityLevel, :issuedAt, :expiresAt, :statusListId, :statusListIdx)
+            ON CONFLICT (wallet_public_key_thumbprint) DO UPDATE SET
+                wua_id = EXCLUDED.wua_id, status = EXCLUDED.status,
+                wscd_type = EXCLUDED.wscd_type, wscd_security_level = EXCLUDED.wscd_security_level,
+                issued_at = EXCLUDED.issued_at, expires_at = EXCLUDED.expires_at,
+                status_list_id = EXCLUDED.status_list_id, status_list_idx = EXCLUDED.status_list_idx
             """)
             .param("wuaId", wua.wuaId())
             .param("walletPublicKeyThumbprint", wua.walletPublicKeyThumbprint())
             .param("status", wua.status())
             .param("wscdType", wua.wscdType())
             .param("wscdSecurityLevel", wua.wscdSecurityLevel())
-            .param("issuedAt", wua.issuedAt())
-            .param("expiresAt", wua.expiresAt())
+            .param("issuedAt", toOffsetDateTime(wua.issuedAt()))
+            .param("expiresAt", toOffsetDateTime(wua.expiresAt()))
             .param("statusListId", wua.statusListId())
             .param("statusListIdx", wua.statusListIdx())
             .update();

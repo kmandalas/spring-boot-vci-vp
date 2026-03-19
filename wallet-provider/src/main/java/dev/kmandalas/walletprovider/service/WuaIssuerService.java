@@ -1,10 +1,12 @@
 package dev.kmandalas.walletprovider.service;
 
 import dev.kmandalas.walletprovider.config.WpMetadataConfig;
+import dev.kmandalas.walletprovider.event.WuaIssuedEvent;
 import dev.kmandalas.walletprovider.model.KeyAttestationData;
 import dev.kmandalas.walletprovider.model.WalletUnitAttestation;
 import dev.kmandalas.walletprovider.model.WuaCredentialRequest;
 import dev.kmandalas.walletprovider.repository.WuaRepository;
+import io.namastack.outbox.Outbox;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
@@ -18,6 +20,7 @@ import com.nimbusds.jwt.SignedJWT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertificateException;
@@ -41,18 +44,21 @@ public class WuaIssuerService {
     private final QtspAttestationService qtspAttestationService;
     private final WpSigningService wpSigningService;
     private final StatusListIndexService statusListIndexService;
+    private final Outbox outbox;
 
     public WuaIssuerService(WpMetadataConfig wpMetadataConfig, WuaRepository wuaRepository,
                            KeyAttestationService keyAttestationService,
                            QtspAttestationService qtspAttestationService,
                            WpSigningService wpSigningService,
-                           StatusListIndexService statusListIndexService) {
+                           StatusListIndexService statusListIndexService,
+                           Outbox outbox) {
         this.wpMetadataConfig = wpMetadataConfig;
         this.wuaRepository = wuaRepository;
         this.keyAttestationService = keyAttestationService;
         this.qtspAttestationService = qtspAttestationService;
         this.wpSigningService = wpSigningService;
         this.statusListIndexService = statusListIndexService;
+        this.outbox = outbox;
     }
 
     public String generateNonce() {
@@ -96,6 +102,7 @@ public class WuaIssuerService {
         };
     }
 
+    @Transactional
     public WuaIssuanceResult issueWua(JWK walletKey, KeyAttestationData attestationData)
             throws JOSEException {
 
@@ -125,7 +132,15 @@ public class WuaIssuerService {
         );
         wuaRepository.save(wua);
 
-        logger.info("Issued WUA: id={}, wscdType={}, statusListIdx={}, expires={}",
+        // Publish event to outbox (same transaction)
+        outbox.schedule(
+                new WuaIssuedEvent(wuaId, thumbprint, WalletUnitAttestation.STATUS_ACTIVE,
+                        attestationData.wscdType(), attestationData.wscdSecurityLevel(),
+                        issuedAt, expiresAt, statusList.id(), statusListIdx),
+                wuaId.toString()
+        );
+
+        logger.info("📋 Issued WUA: id={}, wscdType={}, statusListIdx={}, expires={}",
                 wuaId, attestationData.wscdType(), statusListIdx, expiresAt);
 
         return new WuaIssuanceResult(wuaJwt, wuaId);

@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static dev.kmandalas.walletprovider.util.JdbcUtil.toOffsetDateTime;
+
 @Repository
 public class StatusListRepository {
 
@@ -25,7 +27,7 @@ public class StatusListRepository {
             .param("id", statusList.id())
             .param("bits", statusList.bits())
             .param("maxEntries", statusList.maxEntries())
-            .param("createdAt", statusList.createdAt())
+            .param("createdAt", toOffsetDateTime(statusList.createdAt()))
             .update();
     }
 

@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
@@ -21,13 +20,15 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * Production: The Wallet Provider Interface (WPI) is proprietary per ARF - not standardized.
  */
 @Configuration
-@EnableConfigurationProperties(AppCheckProperties.class)
+@EnableConfigurationProperties({AppCheckProperties.class, AdminApiProperties.class})
 public class SecurityConfig {
 
     private final AppCheckProperties appCheckProperties;
+    private final AdminApiProperties adminApiProperties;
 
-    public SecurityConfig(AppCheckProperties appCheckProperties) {
+    public SecurityConfig(AppCheckProperties appCheckProperties, AdminApiProperties adminApiProperties) {
         this.appCheckProperties = appCheckProperties;
+        this.adminApiProperties = adminApiProperties;
     }
 
     @Bean
@@ -35,10 +36,8 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .headers(headers -> headers
-                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
-                )
-                .addFilterBefore(new AppCheckFilter(appCheckProperties), AuthorizationFilter.class);
+                .addFilterBefore(new AppCheckFilter(appCheckProperties), AuthorizationFilter.class)
+                .addFilterBefore(new AdminApiKeyFilter(adminApiProperties), AppCheckFilter.class);
 
         return http.build();
     }
