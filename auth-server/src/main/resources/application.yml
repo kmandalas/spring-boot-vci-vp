@@ -21,7 +21,7 @@ app:
     max-pop-age-seconds: 300
     max-wia-age-seconds: 86400
     trust-validator:
-      enabled: false
+      enabled: true
       url: http://localhost:8090
   require-consent: true
   extra-redirect-uris: ""
@@ -45,6 +45,6 @@ app:
     max-wia-age-seconds: 86400
     trust-validator:
       enabled: false
-      url: http://localhost:8090
+      url: https://trust-validator.onrender.com
   require-consent: true
   extra-redirect-uris: "https://www.certification.openid.net/test/a/kmandalas-pda1-issuer/callback"

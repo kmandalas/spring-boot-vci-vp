@@ -4,6 +4,8 @@ import dev.kmandalas.issuer.model.CredentialStatusEntry;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import static dev.kmandalas.issuer.util.JdbcUtil.toOffsetDateTime;
+
 import java.util.List;
 
 @Repository
@@ -22,7 +24,7 @@ public class CredentialStatusRepository {
                 .param(entry.status())
                 .param(entry.statusListId())
                 .param(entry.statusListIdx())
-                .param(entry.issuedAt())
+                .param(toOffsetDateTime(entry.issuedAt()))
                 .update();
     }
 

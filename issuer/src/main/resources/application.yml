@@ -3,10 +3,9 @@ spring:
     name: demo-issuer
 
   datasource:
-    url: jdbc:h2:file:./data/issuer;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/eudi?currentSchema=issuer
+    username: eudi
+    password: eudi
   sql:
     init:
       mode: always
@@ -46,7 +45,7 @@ app:
       - http://${LOCAL_IP:localhost}:9001/wp
     allowed-wscd-types: all  # Options: all, software, tee, strongbox (comma-separated)
     trust-validator:
-      enabled: false
+      enabled: true
       url: http://localhost:8090
 
 ---
@@ -54,6 +53,11 @@ spring:
   config:
     activate:
       on-profile: cloud
+
+  datasource:
+    url: ${DB_URL}&currentSchema=issuer
+    username: ${DB_USER:eudi}
+    password: ${DB_PASSWORD}
 
   security:
     oauth2:
@@ -77,5 +81,5 @@ app:
       - https://wallet-provider.onrender.com/wp
     allowed-wscd-types: all
     trust-validator:
-      enabled: false
-      url: http://localhost:8090
+      enabled: true
+      url: https://trust-validator.onrender.com

@@ -4,6 +4,8 @@ import dev.kmandalas.issuer.model.StatusList;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import static dev.kmandalas.issuer.util.JdbcUtil.toOffsetDateTime;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -23,7 +25,7 @@ public class StatusListRepository {
                 .param(statusList.id())
                 .param(statusList.bits())
                 .param(statusList.maxEntries())
-                .param(statusList.createdAt())
+                .param(toOffsetDateTime(statusList.createdAt()))
                 .update();
     }
 
