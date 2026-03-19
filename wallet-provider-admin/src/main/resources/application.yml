@@ -28,7 +28,7 @@ admin:
 # Wallet-provider connection (event polling + revocation commands)
 wallet-provider:
   base-url: http://localhost:9001
-  api-key: changeme-admin-key
+  api-key: ${WP_ADMIN_API_KEY:changeme-admin-key}
   poll-interval-seconds: 5
 
 logging:
