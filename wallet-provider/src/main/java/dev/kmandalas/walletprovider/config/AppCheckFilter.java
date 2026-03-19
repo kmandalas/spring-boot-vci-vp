@@ -37,7 +37,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         if (!properties.enabled()) return true;
         String path = request.getRequestURI();
-        return path.contains("/.well-known/") || path.contains("/wua/status/");
+        return path.contains("/.well-known/") || path.contains("/wua/status/") || path.startsWith("/wp/admin/api/");
     }
 
     @Override
